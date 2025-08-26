@@ -55,9 +55,6 @@ export default function ApiKeyCard({ apiKey, onDelete }: ApiKeyCardProps) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{apiKey.name || apiKey.label || '未命名API密钥'}</h3>
-          {apiKey.description && (
-            <p className="text-sm text-gray-600 mt-1">{apiKey.description}</p>
-          )}
         </div>
         <div className="flex items-center space-x-2">
           <span className={`px-2 py-1 text-xs rounded-full ${

@@ -56,6 +56,27 @@ export interface Tool {
   requires_connection?: boolean;
 }
 
+export interface Connection {
+  id: string;
+  user_id: string;
+  toolkit_id: number;
+  name: string;
+  enabled: boolean;
+  status: 'valid' | 'invalid' | 'pending' | 'expired';
+  priority: number;
+  labels: Record<string, any>;
+  last_used_at?: string;
+  auth_method: 'none' | 'api_key' | 'oauth2' | 'basic';
+  scopes?: string[];
+  expires_at?: string;
+  last_error?: string;
+  mcp_transport?: string;
+  mcp_endpoint_url?: string;
+  mcp_protocol_version?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;

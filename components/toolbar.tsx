@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { TL } from "@/lib/terralink";
 
 export default function Toolbar() {
   const [user, setUser] = useState<{ user_id: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -45,21 +47,55 @@ export default function Toolbar() {
     );
   }
 
+
+
   return (
-    <div className="bg-white shadow-sm border-b px-6 py-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Terralink Console</h1>
-          {user && (
-            <p className="text-sm text-gray-600">Welcome, {user.user_id}</p>
-          )}
+    <div className="bg-white shadow-sm border-b">
+      <div className="px-6 py-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Terralink Console</h1>
+            {user && (
+              <p className="text-sm text-gray-600">Welcome, {user.user_id}</p>
+            )}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            Logout
+          </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-        >
-          Logout
-        </button>
+      </div>
+      
+      {/* Navigation Menu */}
+      <div className="px-6 py-2 border-t border-gray-100">
+        <nav className="flex space-x-6">
+          <Link 
+            href="/toolkits" 
+            className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+              pathname === '/toolkits' ? 'text-blue-700 font-bold' : 'text-gray-700'
+            }`}
+          >
+            工具包
+          </Link>
+          <Link 
+            href="/my-toolkits" 
+            className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+              pathname === '/my-toolkits' ? 'text-blue-700 font-bold' : 'text-gray-700'
+            }`}
+          >
+            我的工具包
+          </Link>
+          <Link 
+            href="/app" 
+            className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+              pathname === '/app' ? 'text-blue-700 font-bold' : 'text-gray-700'
+            }`}
+          >
+            控制台
+          </Link>
+        </nav>
       </div>
     </div>
   );

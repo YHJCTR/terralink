@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Toolbar from "@/components/toolbar";
 import ApiKeyCard from "@/components/api-key-card";
 import ToolkitCard from "@/components/toolkit-card";
 import { TL } from "@/lib/terralink";
@@ -35,33 +34,7 @@ export default function ConsolePage() {
         if (activeTab === "api-keys") {
           const keys = await TL.listApiKeys();
           setApiKeys(keys);
-        } else if (activeTab === "toolkits") {
-          const [toolkitData, accountData] = await Promise.all([
-            TL.listToolkits(),
-            TL.listAccounts(userData.user_id)
-          ]);
-          
-          // 后端API已经返回包含tools的toolkit数据，直接使用
-          const toolkitsWithStatus = (toolkitData as Toolkit[]).map((toolkit: Toolkit) => {
-            const toolkitAccounts = (accountData as any[]).filter((acc: any) => acc.toolkit === toolkit.name);
-            
-            return {
-              ...toolkit,
-              tools: (toolkit.tools || []).map((tool: Tool) => ({
-                ...tool,
-                // 计算工具状态：如果需要连接且没有连接账户，则不可用
-                status: tool.requires_connection && toolkitAccounts.length === 0 
-                  ? 'unavailable' 
-                  : 'available'
-              }))
-            };
-          });
-          
-          setToolkits(toolkitsWithStatus);
-          // 从toolkit中提取所有tools
-          const allTools = toolkitsWithStatus.flatMap(tk => tk.tools || []);
-          setTools(allTools);
-          setAccounts(accountData as any[]);
+
         } else if (activeTab === "oauth-accounts") {
           const oauthData = await TL.listOAuthAccounts();
           setOAuthAccounts(oauthData as any[]);
@@ -128,7 +101,10 @@ export default function ConsolePage() {
     if (!user) return;
     
     try {
-      const connection = await TL.createConnection(toolkit, user.user_id);
+      const connection = await TL.createConnection(toolkit, {
+        name: `${toolkit} Connection`,
+        auth_method: 'oauth2'
+      });
       console.log("Connection created:", connection);
       
       // 如果有redirect_url，打开OAuth认证页面
@@ -137,58 +113,55 @@ export default function ConsolePage() {
         window.open((connection as any).redirect_url, '_blank');
       }
       
-      // 添加轮询逻辑
-      const pollInterval = setInterval(async () => {
-        try {
-          const status = await TL.pollConnection((connection as any).connection_id);
-          console.log("Connection status:", status);
-          
-          // 在 handleConnectToolkit 函数中，连接授权后的数据刷新部分
-          if ((status as any).status === 'authorized') {
-            clearInterval(pollInterval);
-            console.log("Connection authorized, refreshing data...");
-            
-            // 刷新账户列表和工具数据
-            const [accountData, toolkitData] = await Promise.all([
-              TL.listAccounts(user.user_id),
-              TL.listToolkits()
-            ]);
-            
-            // 重新计算工具状态（关键修复）
-            const toolkitsWithStatus = (toolkitData as Toolkit[]).map((toolkit: Toolkit) => {
-              const toolkitAccounts = (accountData as any[]).filter((acc: any) => acc.toolkit === toolkit.name);
-              
-              return {
-                ...toolkit,
-                tools: (toolkit.tools || []).map((tool: Tool) => ({
-                  ...tool,
-                  // 计算工具状态：如果需要连接且没有连接账户，则不可用
-                  status: tool.requires_connection && toolkitAccounts.length === 0 
-                    ? 'unavailable' 
-                    : 'available'
-                }))
-              };
-            });
-            
-            setAccounts(accountData as any[]);
-            setToolkits(toolkitsWithStatus); // 使用重新计算状态的数据
-            // 从toolkit中提取所有tools
-            const allTools = toolkitsWithStatus.flatMap(tk => tk.tools || []);
-            setTools(allTools);
-            
-            alert(`${toolkit} 连接成功！`);
+      // OAuth2连接创建后，用户需要手动完成授权流程
+      // 这里可以添加提示信息或者刷新逻辑
+      if ((connection as any).auth_url) {
+        console.log("Opening OAuth URL:", (connection as any).auth_url);
+        window.open((connection as any).auth_url, '_blank');
+        alert(`请在新窗口中完成 ${toolkit} 的授权，完成后刷新页面查看连接状态。`);
+      } else {
+        // 对于非OAuth连接，直接刷新数据
+        const toolkitData = await TL.listToolkits();
+        
+        // 获取所有工具包的连接信息
+        const allConnections: any[] = [];
+        for (const toolkit of toolkitData as any[]) {
+          try {
+            const connections = await TL.getToolkitConnections(toolkit.name);
+            allConnections.push(...connections.map((conn: any) => ({
+              ...conn,
+              toolkit: toolkit.name
+            })));
+          } catch (error) {
+            console.warn(`Failed to get connections for toolkit ${toolkit.name}:`, error);
           }
-        } catch (error) {
-          console.error("Failed to poll connection status:", error);
-          clearInterval(pollInterval);
         }
-      }, 2000); // 每2秒轮询一次
-      
-      // 设置超时，避免无限轮询
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        console.log("Connection polling timeout");
-      }, 30000); // 30秒超时
+        const accountData = allConnections;
+        
+        // 重新计算工具状态
+        const toolkitsWithStatus = (toolkitData as Toolkit[]).map((toolkit: Toolkit) => {
+          const toolkitAccounts = (accountData as any[]).filter((acc: any) => acc.toolkit === toolkit.name);
+          
+          return {
+            ...toolkit,
+            tools: (toolkit.tools || []).map((tool: Tool) => ({
+              ...tool,
+              status: tool.requires_connection && toolkitAccounts.length === 0 
+                ? 'unavailable' 
+                : 'available'
+            }))
+          };
+        });
+        
+        setAccounts(accountData as any[]);
+        setToolkits(toolkitsWithStatus);
+        const allTools = toolkitsWithStatus.reduce((acc: Tool[], tk: Toolkit) => {
+          return acc.concat(tk.tools || []);
+        }, []);
+        setTools(allTools);
+        
+        alert(`${toolkit} 连接成功！`);
+      }
       
     } catch (error) {
       console.error("Failed to connect toolkit:", error);
@@ -197,10 +170,23 @@ export default function ConsolePage() {
 
   const handleRevokeAccount = async (id: string | number) => {
     try {
-      await TL.revokeAccount(id);
+      await TL.deleteConnection(String(id));
       if (user) {
-        const accountData = await TL.listAccounts(user.user_id);
-        setAccounts(accountData as any[]);
+        // 重新获取所有工具包的连接信息
+        const toolkitData = await TL.listToolkits();
+        const allConnections: any[] = [];
+        for (const toolkit of toolkitData as any[]) {
+          try {
+            const connections = await TL.getToolkitConnections(toolkit.name);
+            allConnections.push(...connections.map((conn: any) => ({
+              ...conn,
+              toolkit: toolkit.name
+            })));
+          } catch (error) {
+            console.warn(`Failed to get connections for toolkit ${toolkit.name}:`, error);
+          }
+        }
+        setAccounts(allConnections);
       }
     } catch (error) {
       console.error("Failed to revoke account:", error);
@@ -245,7 +231,6 @@ export default function ConsolePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Toolbar />
         <div className="max-w-6xl mx-auto p-6">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
@@ -273,7 +258,6 @@ export default function ConsolePage() {
   // 在return语句的最后添加模态对话框
   return (
     <div className="min-h-screen bg-gray-50">
-      <Toolbar />
       
       <div className="max-w-6xl mx-auto p-6">
         <div className="mb-8">
@@ -289,16 +273,7 @@ export default function ConsolePage() {
               >
                 API Keys
               </button>
-              <button
-                onClick={() => setActiveTab("toolkits")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "toolkits"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                Toolkits
-              </button>
+
               <button
                 onClick={() => setActiveTab("oauth-accounts")}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -360,20 +335,7 @@ export default function ConsolePage() {
           </div>
         )}
 
-        {activeTab === "toolkits" && (
-          <div className="space-y-4">
-            {toolkits.map((toolkit) => (
-              <ToolkitCard
-                key={toolkit.name}
-                toolkit={toolkit}
-                connectedAccounts={accounts.filter(acc => acc.toolkit === toolkit.name)}
-                onConnect={() => handleConnectToolkit(toolkit.name)}
-                onRevokeAccount={handleRevokeAccount}
-                onExecuteTool={handleExecuteTool}
-              />
-            ))}
-          </div>
-        )}
+
 
         {activeTab === "oauth-accounts" && (
           <div className="space-y-4">

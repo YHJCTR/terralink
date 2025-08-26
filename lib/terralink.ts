@@ -44,6 +44,100 @@ interface UserOAuthAccount {
   created_at: string;
 }
 
+// Connection related types
+interface Connection {
+  id: string;
+  user_id: string;
+  toolkit_id: number;
+  name: string;
+  enabled: boolean;
+  status: 'valid' | 'invalid' | 'pending' | 'expired';
+  priority: number;
+  labels: Record<string, any>;
+  last_used_at?: string;
+  auth_method: 'none' | 'api_key' | 'oauth2' | 'basic';
+  scopes?: string[];
+  expires_at?: string;
+  last_error?: string;
+  mcp_transport?: string;
+  mcp_endpoint_url?: string;
+  mcp_protocol_version?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ConnectionCreateRequest {
+  name: string;
+  auth_method: 'none' | 'api_key' | 'oauth2' | 'basic';
+  credentials?: Record<string, any>;
+  scopes?: string[];
+  labels?: Record<string, any>;
+}
+
+interface ConnectionOAuth2StartRequest {
+  name: string;
+  redirect_uri?: string;
+  scopes?: string[];
+  labels?: Record<string, any>;
+}
+
+interface ConnectionOAuth2StartResponse {
+  connection_id: string;
+  auth_url: string;
+  state: string;
+}
+
+// Tool related types
+interface ToolDefinition {
+  tool_key: string;
+  name: string;
+  description: string;
+  input_schema: Record<string, any>;
+  default_enabled: boolean;
+  default_config: Record<string, any>;
+  required_scopes?: string[];
+  version?: string;
+  digest: string;
+}
+
+interface ToolOverride {
+  id: number;
+  connection_id: string;
+  tool_key: string;
+  enabled: boolean;
+  config: Record<string, any>;
+  tool_version?: string;
+  resolved_digest?: string;
+  is_stale: boolean;
+}
+
+interface ToolOverrideRequest {
+  enabled: boolean;
+  config?: Record<string, any>;
+}
+
+interface EffectiveTool {
+  tool_key: string;
+  name: string;
+  description: string;
+  input_schema: Record<string, any>;
+  enabled: boolean;
+  config: Record<string, any>;
+  required_scopes?: string[];
+  version?: string;
+  digest: string;
+  is_stale: boolean;
+}
+
+interface EffectiveToolsResponse {
+  connection_id: string;
+  toolkit_key: string;
+  tools: EffectiveTool[];
+  total_count: number;
+  enabled_count: number;
+  disabled_count: number;
+}
+
 export const TL = {
   // auth - 基础认证
   login: (email: string, password: string) =>
@@ -94,12 +188,75 @@ export const TL = {
       body: JSON.stringify({ inputs: args, metadata: context })
     }),
   
-  // connections - GUI版本
-  createConnection: (toolkit: string, user_id: string) =>
-    api("/api/proxy/v1/gui/auth/connections", { method: "POST", body: JSON.stringify({ toolkit, user_id }) }),
-  pollConnection: (id: string) => api(`/api/proxy/v1/gui/auth/connections/${id}`),
+  // connections - GUI版本（基于后端实际实现的端点）
+  // 获取工具包的连接列表
+  getToolkitConnections: (toolkitKey: string) =>
+    api<Connection[]>(`/api/proxy/v1/gui/toolkits/${encodeURIComponent(toolkitKey)}/connections`),
+  
+  // 创建新连接
+  createConnection: (toolkitKey: string, request: ConnectionCreateRequest) =>
+    api<Connection>(`/api/proxy/v1/gui/toolkits/${encodeURIComponent(toolkitKey)}/connections`, {
+      method: "POST",
+      body: JSON.stringify(request)
+    }),
+  
+  // 获取连接的有效工具列表
+  getConnectionTools: (connectionId: string, includeDisabled: boolean = false) =>
+    api<EffectiveToolsResponse>(`/api/proxy/v1/gui/connections/${encodeURIComponent(connectionId)}/tools?include_disabled=${includeDisabled}`),
+  
+  // SDK版本的API（用于完整功能）
+  // 开始OAuth2流程
+  startOAuth2Flow: (toolkitKey: string, request: ConnectionOAuth2StartRequest) =>
+    api<ConnectionOAuth2StartResponse>(`/api/proxy/v1/sdk/toolkits/${encodeURIComponent(toolkitKey)}/connections/oauth2-start`, {
+      method: "POST",
+      body: JSON.stringify(request)
+    }),
+  
+  // 获取特定连接
+  getConnection: (connectionId: string) =>
+    api<Connection>(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}`),
+  
+  // 更新连接
+  updateConnection: (connectionId: string, request: Partial<ConnectionCreateRequest>) =>
+    api<Connection>(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(request)
+    }),
+  
+  // 删除连接
+  deleteConnection: (connectionId: string) =>
+    api(`/api/proxy/v1/gui/connections/${encodeURIComponent(connectionId)}`, { method: "DELETE" }),
+  
+  // 设置工具覆盖（启用/禁用工具）
+  setToolOverride: (connectionId: string, toolKey: string, request: ToolOverrideRequest) =>
+    api<ToolOverride>(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/tools/${encodeURIComponent(toolKey)}`, {
+      method: "PATCH",
+      body: JSON.stringify(request)
+    }),
+  
+  // 删除工具覆盖
+  deleteToolOverride: (connectionId: string, toolKey: string) =>
+    api(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/tools/${encodeURIComponent(toolKey)}`, {
+      method: "DELETE"
+    }),
+  
+  // 获取工具包的工具定义
+  getToolkitTools: (toolkitKey: string) =>
+    api<ToolDefinition[]>(`/api/proxy/v1/sdk/toolkits/${encodeURIComponent(toolkitKey)}/tools`),
+  
+  // 测试连接
+  testConnection: (connectionId: string) =>
+    api(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/test`, { method: "POST" }),
+  
+  // 刷新连接
+  refreshConnection: (connectionId: string) =>
+    api(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/refresh`, { method: "POST" }),
+  
+  // 旧的API保持兼容性（标记为废弃）
+  /** @deprecated 使用 getToolkitConnections 替代 */
   listAccounts: (user_id: string, toolkit?: string) =>
     api(`/api/proxy/v1/gui/auth/connected-accounts?user_id=${user_id}${toolkit ? `&toolkit=${toolkit}` : ""}`),
+  /** @deprecated 使用 deleteConnection 替代 */
   revokeAccount: (id: string|number) =>
     api(`/api/proxy/v1/gui/auth/connected-accounts/${id}`, { method: "DELETE" }),
 };

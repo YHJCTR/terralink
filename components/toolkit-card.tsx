@@ -10,7 +10,7 @@ interface ToolkitCardProps {
   connectedAccounts?: any[];
   onConnect: () => void;
   onRevokeAccount: (id: string | number) => void;
-  onExecuteTool: (toolSlug: string, args: any) => void;
+  onExecuteTool: (toolSlug: string, args: any) => Promise<any>;
 }
 
 export default function ToolkitCard({ 
@@ -38,50 +38,58 @@ export default function ToolkitCard({
     setIsDialogOpen(true);
   };
 
-  const handleToolExecution = (toolSlug: string, args: any) => {
-    onExecuteTool(toolSlug, args);
+  const handleToolExecution = async (toolSlug: string, args: any) => {
+    return await onExecuteTool(toolSlug, args);
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 hover:border-gray-300">
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">{toolkit.name}</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
+                {toolkit.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{toolkit.name}</h3>
+                <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                  toolkit.status === 'active' 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {toolkit.status === 'active' ? '活跃' : '未激活'}
+                </span>
+              </div>
+            </div>
             {toolkit.description && (
-              <p className="text-sm text-gray-600 mt-1">{toolkit.description}</p>
+              <p className="text-sm text-gray-600 mt-2 line-clamp-2">{toolkit.description}</p>
             )}
           </div>
-          <div className="flex items-center space-x-2">
-            <span className={`px-2 py-1 text-xs rounded-full ${
-              toolkit.status === 'active' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800'
-            }`}>
-              {toolkit.status === 'active' ? '活跃' : '未激活'}
-            </span>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-          </div>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-gray-600">版本:</span>
-            <span className="ml-2 text-gray-900">{toolkit.version || 'N/A'}</span>
+        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{toolkit.tools?.length || 0}</div>
+              <div className="text-xs text-gray-500 mt-1">工具数量</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{connectedAccounts.length}</div>
+              <div className="text-xs text-gray-500 mt-1">连接账户</div>
+            </div>
           </div>
-          <div>
-            <span className="text-gray-600">工具数量:</span>
-            <span className="ml-2 text-gray-900">{toolkit.tools?.length || 0}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">更新时间:</span>
-            <span className="ml-2 text-gray-900">{formatDate(toolkit.updated_at)}</span>
-          </div>
+        </div>
+        
+        <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
+          <span>版本: {toolkit.version || 'N/A'}</span>
+          <span>更新: {formatDate(toolkit.updated_at)}</span>
         </div>
 
         {toolkit.tags && toolkit.tags.length > 0 && (
