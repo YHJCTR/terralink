@@ -95,6 +95,14 @@ export default function Toolbar() {
           >
             控制台
           </Link>
+          <Link 
+            href="/execution-history" 
+            className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+              pathname === '/execution-history' ? 'text-blue-700 font-bold' : 'text-gray-700'
+            }`}
+          >
+            执行记录
+          </Link>
         </nav>
       </div>
     </div>

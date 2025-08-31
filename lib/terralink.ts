@@ -1,6 +1,23 @@
+const JWT_COOKIE_NAME = process.env.JWT_COOKIE_NAME || "ef_session";
+function getAuthTokenClient(): string | undefined {
+  if (typeof document !== "undefined") {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${JWT_COOKIE_NAME}=([^;]*)`));
+    if (match) return decodeURIComponent(match[1]);
+  }
+  return undefined;
+}
+
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(path, { ...init, headers: { "content-type": "application/json", ...(init.headers||{}) }});
-  const data = await r.json().catch(()=> ({}));
+  const token = getAuthTokenClient();
+  const r = await fetch(path, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init.headers || {})
+    }
+  });
+  const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data?.error?.message || data?.detail || r.statusText);
   return data as T;
 }
@@ -259,4 +276,46 @@ export const TL = {
   /** @deprecated 使用 deleteConnection 替代 */
   revokeAccount: (id: string|number) =>
     api(`/api/proxy/v1/gui/auth/connected-accounts/${id}`, { method: "DELETE" }),
+
+  // Analytics API
+  getToolExecutionHistory: (params?: {
+    page?: number;
+    page_size?: number;
+    toolkit_name?: string;
+    tool_name?: string;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          searchParams.append(key, value.toString());
+        }
+      });
+    }
+    return api(`/api/proxy/v1/gui/analytics/executions?${searchParams.toString()}`);
+  },
+
+  getToolExecutionDetail: (executionId: string) =>
+    api(`/api/proxy/v1/gui/analytics/executions/${encodeURIComponent(executionId)}`),
+
+  getUserToolStats: (params?: {
+    start_date?: string;
+    end_date?: string;
+    toolkit_name?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          searchParams.append(key, value.toString());
+        }
+      });
+    }
+    return api(`/api/proxy/v1/analytics/user-tool-stats?${searchParams.toString()}`);
+  },
 };
