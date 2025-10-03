@@ -31,13 +31,19 @@ A modern web interface for the Terralink Platform, built with Next.js 14, React 
    ```
 
 3. **Set up environment variables**:
-   Create a `.env.local` file in the project root:
+   Copy the example environment file and customize it:
+   ```bash
+   cp .env.example .env.local
+   ```
+   
+   Then edit `.env.local` to match your setup:
    ```bash
    # Terralink Platform API Base URL
    NEXT_PUBLIC_TERRALINK_BASE_URL=http://localhost:8000
    
    # JWT Cookie Name (optional, defaults to "ef_session")
    JWT_COOKIE_NAME=ef_session
+   ```
    ```
 
 ## Development
