@@ -10,6 +10,11 @@ import ToolkitPlayground from './toolkit-playground';
 interface ToolkitCardProps {
   toolkit: Toolkit;
   connectedAccounts?: any[];
+  globalStats?: {
+    total_connections: number;
+    valid_enabled_connections: number;
+    unique_users: number;
+  };
   onConnect: () => void;
   onRevokeAccount: (id: string | number) => void;
   onExecuteTool: (toolSlug: string, args: any) => Promise<any>;
@@ -18,6 +23,7 @@ interface ToolkitCardProps {
 export default function ToolkitCard({ 
   toolkit, 
   connectedAccounts = [], 
+  globalStats,
   onConnect, 
   onRevokeAccount, 
   onExecuteTool 
@@ -95,8 +101,12 @@ export default function ToolkitCard({
               <div className="text-xs text-gray-500 mt-1">Tools</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">{connectedAccounts.length}</div>
-          <div className="text-xs text-gray-500 mt-1">Connected Accounts</div>
+          <div className="text-2xl font-bold text-green-600">
+            {globalStats ? globalStats.unique_users : connectedAccounts.length}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            {globalStats ? 'Connected Users' : 'My Connections'}
+          </div>
             </div>
           </div>
         </div>

@@ -210,6 +210,15 @@ export const TL = {
   getToolkitConnections: (toolkitKey: string) =>
     api<Connection[]>(`/api/proxy/v1/gui/toolkits/${encodeURIComponent(toolkitKey)}/connections`),
   
+  // Get toolkit connection statistics
+  getToolkitConnectionStats: (toolkitKey: string) =>
+    api<{
+      toolkit_key: string;
+      total_connections: number;
+      valid_enabled_connections: number;
+      unique_users: number;
+    }>(`/api/proxy/v1/gui/toolkits/${encodeURIComponent(toolkitKey)}/stats`),
+  
   // Create new connection
   createConnection: (toolkitKey: string, request: ConnectionCreateRequest) =>
     api<Connection>(`/api/proxy/v1/gui/toolkits/${encodeURIComponent(toolkitKey)}/connections`, {

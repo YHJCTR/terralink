@@ -31,7 +31,8 @@ export default function MyToolkitsPage() {
             const toolkitConnections = await TL.getToolkitConnections(toolkit.name);
             allConnections.push(...toolkitConnections.map((conn: any) => ({
               ...conn,
-              toolkit: toolkit.name
+              toolkit: toolkit.name,
+              toolkit_name: toolkit.name // Add both for compatibility
             })));
           } catch (error) {
             console.warn(`Failed to get connections for toolkit ${toolkit.name}:`, error);
@@ -42,15 +43,22 @@ export default function MyToolkitsPage() {
         
         // Add connection count information for each toolkit
         const toolkitsWithConnections = (toolkitData as Toolkit[]).map((toolkit: Toolkit) => {
-          const toolkitConnections = allConnections.filter((conn: any) => conn.toolkit === toolkit.name);
+          const toolkitConnections = allConnections.filter((conn: any) => 
+            conn.toolkit === toolkit.name || conn.toolkit_name === toolkit.name
+          );
+          
+          // Count only valid and enabled connections
+          const validConnections = toolkitConnections.filter((conn: any) => 
+            conn.status === 'valid' && conn.enabled
+          );
           
           return {
             ...toolkit,
-            connectionCount: toolkitConnections.length,
+            connectionCount: validConnections.length,
             connections: toolkitConnections,
             tools: (toolkit.tools || []).map((tool: Tool) => ({
               ...tool,
-              status: tool.requires_connection && toolkitConnections.length === 0 
+              status: tool.requires_connection && validConnections.length === 0 
                 ? 'unavailable' 
                 : 'available'
             }))
@@ -166,7 +174,10 @@ export default function MyToolkitsPage() {
               <div key={toolkit.name} className="break-inside-avoid mb-6">
                 <ToolkitCard
                   toolkit={toolkit}
-                  connectedAccounts={connections.filter(conn => conn.toolkit === toolkit.name)}
+                  connectedAccounts={connections.filter(conn => 
+                    (conn.toolkit === toolkit.name || conn.toolkit_name === toolkit.name) &&
+                    conn.status === 'valid' && conn.enabled
+                  )}
                   onConnect={() => {}} // No connection functionality needed on my toolkits page
                   onRevokeAccount={handleRevokeAccount}
                   onExecuteTool={(toolSlug: string, args: any) => handleExecuteTool(toolSlug, args)}

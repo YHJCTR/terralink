@@ -9,6 +9,11 @@ import { Loader2, CheckCircle, XCircle, Search, Filter, X } from 'lucide-react'
 interface ToolkitWithConnections extends Toolkit {
   connectionCount: number;
   connections: any[];
+  globalStats?: {
+    total_connections: number;
+    valid_enabled_connections: number;
+    unique_users: number;
+  };
 }
 
 export default function ToolkitsPage() {
@@ -33,33 +38,52 @@ export default function ToolkitsPage() {
       
       // Get all toolkits
       const toolkitData = await TL.listToolkits()
+      const toolkits = toolkitData as Toolkit[]
       
-      // Get all connection information
-      const allConnections: any[] = []
-      for (const toolkit of toolkitData as Toolkit[]) {
+      // Fetch connections for each toolkit
+      const connectionsPromises = toolkits.map(async (toolkit) => {
         try {
-          const toolkitConnections = await TL.getToolkitConnections(toolkit.name)
-          allConnections.push(...toolkitConnections.map((conn: any) => ({
+          const connections = await TL.getToolkitConnections(toolkit.name);
+          return connections.map((conn: any) => ({
             ...conn,
-            toolkit: toolkit.name
-          })))
+            toolkit: toolkit.name,
+            toolkit_name: toolkit.name
+          }));
         } catch (error) {
-          console.warn(`Failed to get connections for toolkit ${toolkit.name}:`, error)
+          console.error(`Error fetching connections for ${toolkit.name}:`, error);
+          return [];
         }
-      }
+      });
+
+      const allConnections = await Promise.all(connectionsPromises);
+      const connections = allConnections.flat();
       
-      setConnections(allConnections)
+      console.log('🔍 All collected connections:', connections);
+      console.log('🔍 Total connections count:', connections.length);
       
-      // Add connection count information for each toolkit
-      const toolkitsWithConnections = (toolkitData as Toolkit[]).map((toolkit: Toolkit) => {
-        const toolkitConnections = allConnections.filter((conn: any) => conn.toolkit === toolkit.name)
+      setConnections(connections)
+      
+      // Calculate connection count for each toolkit and get global stats
+      const toolkitsWithConnections = await Promise.all(toolkits.map(async (toolkit) => {
+        const toolkitConnections = connections.filter(conn => 
+          conn.toolkit === toolkit.name || conn.toolkit_name === toolkit.name
+        );
+        
+        // Get global statistics for this toolkit
+        let globalStats = undefined;
+        try {
+          globalStats = await TL.getToolkitConnectionStats(toolkit.name);
+        } catch (error) {
+          console.warn(`Failed to get global stats for ${toolkit.name}:`, error);
+        }
         
         return {
           ...toolkit,
           connectionCount: toolkitConnections.length,
           connections: toolkitConnections,
-        }
-      })
+          globalStats,
+        };
+      }));
       
       // Sort toolkits intelligently:
       // 1. Connected toolkits first
@@ -78,6 +102,7 @@ export default function ToolkitsPage() {
         return a.name.localeCompare(b.name)
       })
       
+      console.log('🔍 Final toolkits with connection counts:', sortedToolkits);
       setToolkits(sortedToolkits)
       
     } catch (error) {
@@ -289,7 +314,11 @@ export default function ToolkitsPage() {
                       <div key={toolkit.name} className="h-fit">
                         <ToolkitCard
                           toolkit={toolkit}
-                          connectedAccounts={connections.filter(conn => conn.toolkit === toolkit.name)}
+                          connectedAccounts={connections.filter(conn => 
+                            (conn.toolkit === toolkit.name || conn.toolkit_name === toolkit.name) &&
+                            conn.status === 'valid' && conn.enabled
+                          )}
+                          globalStats={toolkit.globalStats}
                           onConnect={() => handleConnect(toolkit.name)}
                           onRevokeAccount={(accountId: string | number) => handleRevokeAccount(toolkit.name, accountId.toString())}
                           onExecuteTool={(toolSlug: string, args: any) => handleExecuteTool(toolSlug, args)}
@@ -317,7 +346,11 @@ export default function ToolkitsPage() {
                       <div key={toolkit.name} className="h-fit">
                         <ToolkitCard
                           toolkit={toolkit}
-                          connectedAccounts={connections.filter(conn => conn.toolkit === toolkit.name)}
+                          connectedAccounts={connections.filter(conn => 
+                            (conn.toolkit === toolkit.name || conn.toolkit_name === toolkit.name) &&
+                            conn.status === 'valid' && conn.enabled
+                          )}
+                          globalStats={toolkit.globalStats}
                           onConnect={() => handleConnect(toolkit.name)}
                           onRevokeAccount={(accountId: string | number) => handleRevokeAccount(toolkit.name, accountId.toString())}
                           onExecuteTool={(toolSlug: string, args: any) => handleExecuteTool(toolSlug, args)}

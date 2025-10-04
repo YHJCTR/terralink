@@ -130,7 +130,8 @@ export default function ConsolePage() {
             const connections = await TL.getToolkitConnections(toolkit.name);
             allConnections.push(...connections.map((conn: any) => ({
               ...conn,
-              toolkit: toolkit.name
+              toolkit: toolkit.name,
+              toolkit_name: toolkit.name // Add both for compatibility
             })));
           } catch (error) {
             console.warn(`Failed to get connections for toolkit ${toolkit.name}:`, error);
@@ -140,13 +141,20 @@ export default function ConsolePage() {
         
         // Recalculate tool status
         const toolkitsWithStatus = (toolkitData as Toolkit[]).map((toolkit: Toolkit) => {
-          const toolkitAccounts = (accountData as any[]).filter((acc: any) => acc.toolkit === toolkit.name);
+          const toolkitAccounts = (accountData as any[]).filter((acc: any) => 
+            acc.toolkit === toolkit.name || acc.toolkit_name === toolkit.name
+          );
+          
+          // Count only valid and enabled connections
+          const validConnections = toolkitAccounts.filter((acc: any) => 
+            acc.status === 'valid' && acc.enabled
+          );
           
           return {
             ...toolkit,
             tools: (toolkit.tools || []).map((tool: Tool) => ({
               ...tool,
-              status: tool.requires_connection && toolkitAccounts.length === 0 
+              status: tool.requires_connection && validConnections.length === 0 
                 ? 'unavailable' 
                 : 'available'
             }))
@@ -180,7 +188,8 @@ export default function ConsolePage() {
             const connections = await TL.getToolkitConnections(toolkit.name);
             allConnections.push(...connections.map((conn: any) => ({
               ...conn,
-              toolkit: toolkit.name
+              toolkit: toolkit.name,
+              toolkit_name: toolkit.name // Add both for compatibility
             })));
           } catch (error) {
             console.warn(`Failed to get connections for toolkit ${toolkit.name}:`, error);
