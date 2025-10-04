@@ -42,7 +42,7 @@ export default function ToolExecutionDialog({
       const value = parameters[paramKey];
       if (value === undefined || value === null || value === '') {
         const param = tool.parameters.properties?.[paramKey];
-        errors.push(`${paramKey}${param?.description ? ` (${param.description})` : ''} 是必填参数`);
+        errors.push(`${paramKey}${param?.description ? ` (${param.description})` : ''} is required`);
       }
     });
     
@@ -52,7 +52,7 @@ export default function ToolExecutionDialog({
   const handleExecute = async () => {
     const validation = validateParameters();
     if (!validation.isValid) {
-      alert(`参数验证失败:\n${validation.errors.join('\n')}`);
+      alert(`Parameter validation failed:\n${validation.errors.join('\n')}`);
       return;
     }
     
@@ -62,7 +62,7 @@ export default function ToolExecutionDialog({
     setShowResult(false);
     
     try {
-      // 清理参数，移除空值
+      // Clean parameters, remove empty values
       const cleanedParameters = Object.entries(parameters).reduce((acc, [key, value]) => {
         if (value !== '' && value !== null && value !== undefined) {
           acc[key] = value;
@@ -75,7 +75,7 @@ export default function ToolExecutionDialog({
       setShowResult(true);
     } catch (error) {
       console.error('Tool execution failed:', error);
-      setExecutionError(error instanceof Error ? error.message : '工具执行失败');
+      setExecutionError(error instanceof Error ? error.message : 'Tool execution failed');
       setShowResult(true);
     } finally {
       setIsExecuting(false);
@@ -106,7 +106,7 @@ export default function ToolExecutionDialog({
 
     switch (param.type) {
       case 'string':
-        // 检查是否有枚举值
+        // Check if there are enum values
         if (param.enum && Array.isArray(param.enum)) {
           return (
             <select
@@ -114,7 +114,7 @@ export default function ToolExecutionDialog({
               onChange={(e) => handleChange(e.target.value)}
               className={inputClass}
             >
-              <option value="">请选择...</option>
+              <option value="">Please select...</option>
               {param.enum.map((option: string) => (
                 <option key={option} value={option}>
                   {option}
@@ -123,14 +123,14 @@ export default function ToolExecutionDialog({
             </select>
           );
         }
-        // 检查是否是长文本
+        // Check if it's long text
         if (param.format === 'textarea' || (param.maxLength && param.maxLength > 100)) {
           return (
             <textarea
               value={value}
               onChange={(e) => handleChange(e.target.value)}
               className={inputClass}
-              placeholder={param.description || `请输入${key}`}
+              placeholder={param.description || `Enter ${key}`}
               rows={3}
               maxLength={param.maxLength}
             />
@@ -142,7 +142,7 @@ export default function ToolExecutionDialog({
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             className={inputClass}
-            placeholder={param.description || `请输入${key}`}
+            placeholder={param.description || `Enter ${key}`}
             maxLength={param.maxLength}
             pattern={param.pattern}
           />
@@ -156,7 +156,7 @@ export default function ToolExecutionDialog({
             value={value}
             onChange={(e) => handleChange(param.type === 'integer' ? parseInt(e.target.value) || '' : parseFloat(e.target.value) || '')}
             className={inputClass}
-            placeholder={param.description || `请输入${key}`}
+            placeholder={param.description || `Enter ${key}`}
             min={param.minimum}
             max={param.maximum}
             step={param.type === 'integer' ? 1 : 'any'}
@@ -188,10 +188,10 @@ export default function ToolExecutionDialog({
                 handleChange(lines);
               }}
               className={inputClass}
-              placeholder={param.description || `每行输入一个${key}项目`}
+              placeholder={param.description || `Enter one ${key} item per line`}
               rows={3}
             />
-            <p className="text-xs text-gray-500">每行输入一个项目</p>
+            <p className="text-xs text-gray-500">Enter one item per line</p>
           </div>
         );
       
@@ -208,7 +208,7 @@ export default function ToolExecutionDialog({
               }
             }}
             className={inputClass}
-            placeholder={param.description || `请输入JSON格式的${key}`}
+            placeholder={param.description || `Enter JSON format for ${key}`}
             rows={4}
           />
         );
@@ -220,7 +220,7 @@ export default function ToolExecutionDialog({
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             className={inputClass}
-            placeholder={param.description || `请输入${key}`}
+            placeholder={param.description || `Enter ${key}`}
           />
         );
     }
@@ -231,7 +231,7 @@ export default function ToolExecutionDialog({
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-semibold text-gray-400">执行工具: {tool.name}</h2>
+            <h2 className="text-xl font-semibold text-gray-400">Execute Tool: {tool.name}</h2>
             {tool.description && (
               <p className="text-sm text-gray-600 mt-1">{tool.description}</p>
             )}
@@ -246,10 +246,10 @@ export default function ToolExecutionDialog({
 
         <div className="p-6">
           {!showResult ? (
-            // 参数配置界面
+            // Parameter configuration interface
             tool.parameters && tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0 ? (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900">参数配置</h3>
+                <h3 className="text-lg font-medium text-gray-900">Parameter Configuration</h3>
                 {Object.entries(tool.parameters.properties).map(([key, param]: [string, any]) => {
                   const isRequired = tool.parameters.required?.includes(key);
                   const hasValue = parameters[key] !== undefined && parameters[key] !== null && parameters[key] !== '';
@@ -274,39 +274,39 @@ export default function ToolExecutionDialog({
                           <p className="text-xs text-gray-500 flex-1">{param.description}</p>
                         )}
                         {isRequired && !hasValue && (
-                          <p className="text-xs text-red-500 ml-2">必填</p>
-                        )}
-                      </div>
-                      {/* 显示参数约束信息 */}
-                      {(param.minimum !== undefined || param.maximum !== undefined || param.maxLength || param.enum) && (
-                        <div className="text-xs text-gray-400">
-                          {param.minimum !== undefined && `最小值: ${param.minimum}`}
-                          {param.maximum !== undefined && ` 最大值: ${param.maximum}`}
-                          {param.maxLength && ` 最大长度: ${param.maxLength}`}
-                          {param.enum && ` 可选值: ${param.enum.join(', ')}`}
-                        </div>
-                      )}
+                          <p className="text-xs text-red-500 ml-2">Required</p>
+                  )}
+                </div>
+                {/* Display parameter constraint information */}
+                 {(param.minimum !== undefined || param.maximum !== undefined || param.maxLength || param.enum) && (
+                   <p className="text-xs text-gray-500 mt-1">
+                     {param.minimum !== undefined && `Min: ${param.minimum}`}
+                     {param.maximum !== undefined && ` Max: ${param.maximum}`}
+                     {param.maxLength && ` Max length: ${param.maxLength}`}
+                     {param.enum && ` Options: ${param.enum.join(', ')}`}
+                   </p>
+                 )}
                     </div>
                   );
                 })}
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-500">此工具无需参数配置</p>
+                <p className="text-gray-500">This tool requires no parameter configuration</p>
               </div>
             )
           ) : (
-            // 执行结果界面
+            // Execution result interface
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">执行结果</h3>
+              <h3 className="text-lg font-medium text-gray-900">Execution Result</h3>
               {executionError ? (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <h4 className="text-red-800 font-medium mb-2">执行失败</h4>
+                  <h4 className="text-red-800 font-medium mb-2">Execution Failed</h4>
                   <p className="text-red-700 text-sm">{executionError}</p>
                 </div>
               ) : (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="text-green-800 font-medium mb-2">执行成功</h4>
+                  <h4 className="text-green-800 font-medium mb-2">Execution Successful</h4>
                   <div className="bg-white border rounded p-3 max-h-96 overflow-y-auto">
                     <pre className="text-sm text-gray-800 whitespace-pre-wrap">
                       {typeof executionResult === 'string' 
@@ -323,36 +323,36 @@ export default function ToolExecutionDialog({
 
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
           {!showResult ? (
-            // 参数配置阶段的按钮
+            // Parameter configuration stage buttons
             <>
               <button
                 onClick={handleClose}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
               >
-                取消
+                Cancel
               </button>
               <button
                 onClick={handleExecute}
                 disabled={isExecuting}
                 className="px-4 py-2 bg-blue-500 text-black rounded-md hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
               >
-                {isExecuting ? '执行中...' : '执行工具'}
+                {isExecuting ? 'Executing...' : 'Execute Tool'}
               </button>
             </>
           ) : (
-            // 结果显示阶段的按钮
+            // Result display stage buttons
             <>
               <button
                 onClick={() => setShowResult(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
               >
-                返回
+                Back
               </button>
               <button
                 onClick={handleClose}
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
               >
-                关闭
+                Close
               </button>
             </>
           )}

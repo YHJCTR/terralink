@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 设置httpOnly cookie
+    // Set httpOnly cookie
     cookies().set(JWT_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -3,7 +3,7 @@ const BASE = process.env.NEXT_PUBLIC_TERRALINK_BASE_URL!;
 export async function POST(req: Request) {
   const body = await req.json();
   
-  // 直接使用前端发送的字段
+  // Use fields sent by frontend directly
   const platformBody = {
     email: body.email,
     password: body.password

@@ -13,26 +13,26 @@ export default function ConnectionCallbackPage() {
   useEffect(() => {
     const handleConnectionCallback = async () => {
       if (isProcessing) {
-        console.log('连接回调已在处理中，跳过重复执行');
+        console.log('Connection callback already processing, skipping duplicate execution');
         return;
       }
 
       setIsProcessing(true);
-      console.log('开始处理工具包连接OAuth回调');
+      console.log('Starting toolkit connection OAuth callback processing');
 
       try {
         const code = searchParams.get('code');
         const state = searchParams.get('state');
         const connectionId = searchParams.get('connection_id');
-        const provider = 'github'; // 目前只支持GitHub
+        const provider = 'github'; // Currently only supports GitHub
 
-        console.log('回调参数:', { code: code?.substring(0, 10) + '...', state, connectionId, provider });
+        console.log('Callback parameters:', { code: code?.substring(0, 10) + '...', state, connectionId, provider });
 
         if (!code || !state || !connectionId) {
-          throw new Error('缺少必要的回调参数');
+          throw new Error('Missing required callback parameters');
         }
 
-        // 调用后端连接回调API
+        // Call backend connection callback API
         const response = await fetch('/api/v1/auth/connection/callback', {
           method: 'POST',
           headers: {
@@ -47,48 +47,48 @@ export default function ConnectionCallbackPage() {
         });
 
         const result = await response.json();
-        console.log('连接回调响应:', result);
+        console.log('Connection callback response:', result);
 
         if (response.ok && result.success) {
           setStatus('success');
-          setMessage('GitHub账户连接成功！');
-          console.log('GitHub工具包连接成功');
+          setMessage('GitHub account connected successfully!');
+          console.log('GitHub toolkit connection successful');
           
-          // 延迟后关闭窗口或跳转
+          // Close window or redirect after delay
           setTimeout(() => {
-            // 如果是弹窗，关闭窗口
+            // If it's a popup, close the window
             if (window.opener) {
               window.close();
             } else {
-              // 否则跳转回控制台
+              // Otherwise redirect back to console
               router.push('/console');
             }
           }, 2000);
         } else {
-          throw new Error(result.detail || result.error || '连接失败');
+          throw new Error(result.detail || result.error || 'Connection failed');
         }
       } catch (error) {
-        console.error('工具包连接回调失败:', error);
+        console.error('Toolkit connection callback failed:', error);
         setStatus('error');
-        setMessage(error instanceof Error ? error.message : '连接失败，请重试');
+        setMessage(error instanceof Error ? error.message : 'Connection failed, please try again');
       }
     };
 
     handleConnectionCallback();
-  }, []); // 移除依赖项以防止重复执行
+  }, []); // Remove dependencies to prevent duplicate execution
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            工具包连接
+            Toolkit Connection
           </h2>
           
           {status === 'processing' && (
             <div className="mt-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-600">正在处理GitHub连接...</p>
+              <p className="mt-2 text-sm text-gray-600">Processing GitHub connection...</p>
             </div>
           )}
           
@@ -100,7 +100,7 @@ export default function ConnectionCallbackPage() {
                 </svg>
               </div>
               <p className="mt-2 text-sm text-green-600">{message}</p>
-              <p className="mt-1 text-xs text-gray-500">窗口将自动关闭...</p>
+              <p className="mt-1 text-xs text-gray-500">Window will close automatically...</p>
             </div>
           )}
           
@@ -122,7 +122,7 @@ export default function ConnectionCallbackPage() {
                 }}
                 className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
               >
-                返回控制台
+                Return to Console
               </button>
             </div>
           )}

@@ -156,13 +156,13 @@ interface EffectiveToolsResponse {
 }
 
 export const TL = {
-  // auth - 基础认证
+  // auth - basic authentication
   login: (email: string, password: string) =>
     api<TokenResponse>("/api/proxy/v1/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   register: (email: string, password: string) =>
     api("/api/proxy/v1/register", { method: "POST", body: JSON.stringify({ email, password }) }),
 
-  // OAuth认证
+  // OAuth authentication
   getOAuthProviders: () => api<OAuthProvider[]>("/api/proxy/v1/oauth/providers"),
   initiateOAuth: (provider: string, redirect_uri?: string) =>
     api<OAuthAuthResponse>("/api/proxy/v1/oauth/auth", { 
@@ -175,25 +175,25 @@ export const TL = {
       body: JSON.stringify({ provider, code, state })
     }),
   
-  // OAuth账户管理
+  // OAuth account management
   listOAuthAccounts: () => api<UserOAuthAccount[]>("/api/proxy/v1/gui/oauth/accounts"),
   removeOAuthAccount: (accountId: number) => 
     api(`/api/proxy/v1/gui/oauth/accounts/${accountId}`, { method: "DELETE" }),
 
-  // user info（从平台用 Bearer 获取）
+  // user info (get from platform using Bearer token)
   me: () => api<{ user_id: string }>("/api/proxy/v1/gui/me"),
 
-  // api keys - GUI版本
+  // api keys - GUI version
   listApiKeys: () => api<any[]>("/api/proxy/v1/gui/api-keys"),
   createApiKey: (label?: string, prefix: "live"|"test"="live") =>
     api("/api/proxy/v1/gui/api-keys", { method: "POST", body: JSON.stringify({ label, prefix }) }),
   revokeApiKey: (id: number) => api(`/api/proxy/v1/gui/api-keys/${id}`, { method: "DELETE" }),
   removeApiKey: (id: number) => api(`/api/proxy/v1/gui/api-keys/${id}/remove`, { method: "DELETE" }),
 
-  // toolkits - GUI版本
+  // toolkits - GUI version
   listToolkits: () => api<any[]>("/api/proxy/v1/gui/toolkits"),
   
-  // tools - GUI版本
+  // tools - GUI version
   listTools: (toolkit?: string) => {
     const params = toolkit ? `?toolkit=${encodeURIComponent(toolkit)}` : "";
     return api<any[]>(`/api/proxy/v1/gui/tools${params}`);
@@ -205,75 +205,75 @@ export const TL = {
       body: JSON.stringify({ inputs: args, metadata: context })
     }),
   
-  // connections - GUI版本（基于后端实际实现的端点）
-  // 获取工具包的连接列表
+  // connections - GUI version (based on actual backend endpoints)
+  // Get toolkit connection list
   getToolkitConnections: (toolkitKey: string) =>
     api<Connection[]>(`/api/proxy/v1/gui/toolkits/${encodeURIComponent(toolkitKey)}/connections`),
   
-  // 创建新连接
+  // Create new connection
   createConnection: (toolkitKey: string, request: ConnectionCreateRequest) =>
     api<Connection>(`/api/proxy/v1/gui/toolkits/${encodeURIComponent(toolkitKey)}/connections`, {
       method: "POST",
       body: JSON.stringify(request)
     }),
   
-  // 获取连接的有效工具列表
+  // Get effective tools list for connection
   getConnectionTools: (connectionId: string, includeDisabled: boolean = false) =>
     api<EffectiveToolsResponse>(`/api/proxy/v1/gui/connections/${encodeURIComponent(connectionId)}/tools?include_disabled=${includeDisabled}`),
   
-  // SDK版本的API（用于完整功能）
-  // 开始OAuth2流程
+  // SDK version API (for full functionality)
+  // Start OAuth2 flow
   startOAuth2Flow: (toolkitKey: string, request: ConnectionOAuth2StartRequest) =>
     api<ConnectionOAuth2StartResponse>(`/api/proxy/v1/sdk/toolkits/${encodeURIComponent(toolkitKey)}/connections/oauth2-start`, {
       method: "POST",
       body: JSON.stringify(request)
     }),
   
-  // 获取特定连接
+  // Get specific connection
   getConnection: (connectionId: string) =>
     api<Connection>(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}`),
   
-  // 更新连接
+  // Update connection
   updateConnection: (connectionId: string, request: Partial<ConnectionCreateRequest>) =>
     api<Connection>(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}`, {
       method: "PATCH",
       body: JSON.stringify(request)
     }),
   
-  // 删除连接
+  // Delete connection
   deleteConnection: (connectionId: string) =>
     api(`/api/proxy/v1/gui/connections/${encodeURIComponent(connectionId)}`, { method: "DELETE" }),
   
-  // 设置工具覆盖（启用/禁用工具）
+  // Set tool override (enable/disable tools)
   setToolOverride: (connectionId: string, toolKey: string, request: ToolOverrideRequest) =>
     api<ToolOverride>(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/tools/${encodeURIComponent(toolKey)}`, {
       method: "PATCH",
       body: JSON.stringify(request)
     }),
   
-  // 删除工具覆盖
+  // Delete tool override
   deleteToolOverride: (connectionId: string, toolKey: string) =>
     api(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/tools/${encodeURIComponent(toolKey)}`, {
       method: "DELETE"
     }),
   
-  // 获取工具包的工具定义
+  // Get toolkit tool definitions
   getToolkitTools: (toolkitKey: string) =>
     api<ToolDefinition[]>(`/api/proxy/v1/sdk/toolkits/${encodeURIComponent(toolkitKey)}/tools`),
   
-  // 测试连接
+  // Test connection
   testConnection: (connectionId: string) =>
     api(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/test`, { method: "POST" }),
   
-  // 刷新连接
+  // Refresh connection
   refreshConnection: (connectionId: string) =>
     api(`/api/proxy/v1/sdk/connections/${encodeURIComponent(connectionId)}/refresh`, { method: "POST" }),
   
-  // 旧的API保持兼容性（标记为废弃）
-  /** @deprecated 使用 getToolkitConnections 替代 */
+  // Legacy API for compatibility (marked as deprecated)
+  /** @deprecated Use getToolkitConnections instead */
   listAccounts: (user_id: string, toolkit?: string) =>
     api(`/api/proxy/v1/gui/auth/connected-accounts?user_id=${user_id}${toolkit ? `&toolkit=${toolkit}` : ""}`),
-  /** @deprecated 使用 deleteConnection 替代 */
+  /** @deprecated Use deleteConnection instead */
   revokeAccount: (id: string|number) =>
     api(`/api/proxy/v1/gui/auth/connected-accounts/${id}`, { method: "DELETE" }),
 

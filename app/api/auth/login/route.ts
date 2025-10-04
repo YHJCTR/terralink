@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   });
   const data = await r.json();
   if (!r.ok) return NextResponse.json(data, { status: r.status });
-  // data.access_token 为平台签发的 JWT；前端不持有明文
+  // data.access_token is a JWT issued by the platform; frontend doesn't hold plaintext
   cookies().set(JWT_COOKIE, data.access_token, { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
   return NextResponse.json({ ok: true });
 }

@@ -17,7 +17,7 @@ export default function ConsolePage() {
   const [loading, setLoading] = useState(true);
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [newKeyPrefix, setNewKeyPrefix] = useState<"live" | "test">("live");
-  // 添加新状态用于存储新创建的API key和控制模态对话框
+  // Add new state to store newly created API key and control modal dialog
   const [newCreatedKey, setNewCreatedKey] = useState<any>(null);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
@@ -55,10 +55,10 @@ export default function ConsolePage() {
     try {
       const newKey = await TL.createApiKey(newKeyLabel, newKeyPrefix);
       setNewKeyLabel("");
-      // 保存新创建的key并显示模态对话框
+      // Save newly created key and show modal dialog
       setNewCreatedKey(newKey);
       setShowKeyModal(true);
-      // 更新API key列表
+      // Update API key list
       const keys = await TL.listApiKeys();
       setApiKeys(keys);
     } catch (error) {
@@ -68,32 +68,32 @@ export default function ConsolePage() {
 
   const handleDeleteApiKey = async (id: string | number) => {
     try {
-      // 确保ID是数字类型
+      // Ensure ID is numeric type
       const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
       
-      // 找到当前API key
+      // Find current API key
       const apiKey = apiKeys.find(key => key.id === id || key.id === numericId);
       
       if (apiKey && (apiKey.status === 'active' || apiKey.is_active)) {
-        // 如果是active状态，先revoke（停用）
-        if (confirm('此API密钥当前处于活跃状态，确定要停用吗？')) {
+        // If active status, revoke first (deactivate)
+        if (confirm('This API key is currently active. Are you sure you want to deactivate it?')) {
           await TL.revokeApiKey(numericId);
-          alert('API密钥已停用。如需彻底删除，请再次点击删除按钮。');
+          alert('API key has been deactivated. To permanently delete it, please click the delete button again.');
         }
       } else {
-        // 如果不是active状态，直接remove（永久删除）
-        if (confirm('确定要永久删除此API密钥吗？此操作不可撤销！')) {
+        // If not active status, directly remove (permanent deletion)
+        if (confirm('Are you sure you want to permanently delete this API key? This action cannot be undone!')) {
           await TL.removeApiKey(numericId);
-          alert('API密钥已永久删除。');
+          alert('API key has been permanently deleted.');
         }
       }
       
-      // 刷新API key列表
+      // Refresh API key list
       const keys = await TL.listApiKeys();
       setApiKeys(keys);
     } catch (error) {
       console.error("Failed to delete API key:", error);
-      alert('操作失败，请重试。');
+      alert('Operation failed, please try again.');
     }
   };
 
@@ -107,23 +107,23 @@ export default function ConsolePage() {
       });
       console.log("Connection created:", connection);
       
-      // 如果有redirect_url，打开OAuth认证页面
+      // If there's a redirect_url, open OAuth authentication page
       if ((connection as any).redirect_url && (connection as any).redirect_url !== '') {
         console.log("Opening OAuth URL:", (connection as any).redirect_url);
         window.open((connection as any).redirect_url, '_blank');
       }
       
-      // OAuth2连接创建后，用户需要手动完成授权流程
-      // 这里可以添加提示信息或者刷新逻辑
+      // After OAuth2 connection is created, user needs to manually complete authorization flow
+      // Here we can add prompt information or refresh logic
       if ((connection as any).auth_url) {
         console.log("Opening OAuth URL:", (connection as any).auth_url);
         window.open((connection as any).auth_url, '_blank');
-        alert(`请在新窗口中完成 ${toolkit} 的授权，完成后刷新页面查看连接状态。`);
+        alert(`Please complete the authorization for ${toolkit} in the new window, then refresh the page to view the connection status.`);
       } else {
-        // 对于非OAuth连接，直接刷新数据
+        // For non-OAuth connections, refresh data directly
         const toolkitData = await TL.listToolkits();
         
-        // 获取所有工具包的连接信息
+        // Get connection information for all toolkits
         const allConnections: any[] = [];
         for (const toolkit of toolkitData as any[]) {
           try {
@@ -138,7 +138,7 @@ export default function ConsolePage() {
         }
         const accountData = allConnections;
         
-        // 重新计算工具状态
+        // Recalculate tool status
         const toolkitsWithStatus = (toolkitData as Toolkit[]).map((toolkit: Toolkit) => {
           const toolkitAccounts = (accountData as any[]).filter((acc: any) => acc.toolkit === toolkit.name);
           
@@ -160,7 +160,7 @@ export default function ConsolePage() {
         }, []);
         setTools(allTools);
         
-        alert(`${toolkit} 连接成功！`);
+        alert(`${toolkit} connected successfully!`);
       }
       
     } catch (error) {
@@ -172,7 +172,7 @@ export default function ConsolePage() {
     try {
       await TL.deleteConnection(String(id));
       if (user) {
-        // 重新获取所有工具包的连接信息
+        // Re-fetch connection information for all toolkits
         const toolkitData = await TL.listToolkits();
         const allConnections: any[] = [];
         for (const toolkit of toolkitData as any[]) {
@@ -245,17 +245,17 @@ export default function ConsolePage() {
     );
   }
 
-  // 复制API key到剪贴板的函数
+  // Function to copy API key to clipboard
   const copyKeyToClipboard = async (key: string) => {
     try {
       await navigator.clipboard.writeText(key);
-      alert("API key已复制到剪贴板");
+      alert("API key copied to clipboard");
     } catch (err) {
       console.error("Failed to copy:", err);
     }
   };
 
-  // 在return语句的最后添加模态对话框
+  // Add modal dialog at the end of return statement
   return (
     <div className="min-h-screen bg-gray-50">
       
@@ -328,7 +328,7 @@ export default function ConsolePage() {
                 ))
               ) : (
                 <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm text-center">
-                  <p className="text-gray-600">您还没有API密钥。创建一个新的API密钥开始使用。</p>
+                  <p className="text-gray-600">You don't have any API keys yet. Create a new API key to get started.</p>
                 </div>
               )}
             </div>
@@ -340,9 +340,9 @@ export default function ConsolePage() {
         {activeTab === "oauth-accounts" && (
           <div className="space-y-4">
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">OAuth账户管理</h3>
+              <h3 className="text-lg font-semibold mb-4">OAuth Account Management</h3>
               {oauthAccounts.length === 0 ? (
-                <p className="text-gray-500">暂无OAuth账户</p>
+                <p className="text-gray-500">No OAuth accounts</p>
               ) : (
                 <div className="space-y-3">
                   {oauthAccounts.map((account: any) => (
@@ -354,14 +354,14 @@ export default function ConsolePage() {
                         <div>
                           <div className="font-medium">{account.provider_display_name}</div>
                           <div className="text-sm text-gray-500">{account.email}</div>
-                          <div className="text-xs text-gray-400">连接时间: {new Date(account.created_at).toLocaleDateString()}</div>
+                          <div className="text-xs text-gray-400">Connected: {new Date(account.created_at).toLocaleDateString()}</div>
                         </div>
                       </div>
                       <button
                         onClick={() => handleRemoveOAuthAccount(account.id)}
                         className="px-3 py-1 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
                       >
-                        移除
+                        Remove
                       </button>
                     </div>
                   ))}
@@ -372,13 +372,13 @@ export default function ConsolePage() {
         )}
       </div>
 
-      {/* 工具执行结果显示 */}
+      {/* Tool execution result display */}
       {showResult && executionResult && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
-                工具执行结果: {executionResult.toolSlug}
+                Tool Execution Result: {executionResult.toolSlug}
               </h2>
               <button
                 onClick={() => setShowResult(false)}
@@ -390,12 +390,12 @@ export default function ConsolePage() {
             
             <div className="p-6 space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">执行时间</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Execution Time</h3>
                 <p className="text-sm text-gray-600">{new Date(executionResult.timestamp).toLocaleString()}</p>
               </div>
               
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">输入参数</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Input Parameters</h3>
                 <pre className="bg-gray-50 p-3 rounded text-gray-700 text-sm overflow-x-auto">
                   {JSON.stringify(executionResult.args, null, 2)}
                 </pre>
@@ -403,7 +403,7 @@ export default function ConsolePage() {
               
               {executionResult.result && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">执行结果</h3>
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Execution Result</h3>
                   <div className={`p-3 rounded text-sm ${
                     executionResult.result.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
                   }`}>
@@ -413,13 +413,13 @@ export default function ConsolePage() {
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {executionResult.result.success ? '成功' : '失败'}
+                        {executionResult.result.success ? 'Success' : 'Failed'}
                       </span>
                     </div>
                     
                     {executionResult.result.outputs && (
                       <div>
-                        <h4 className="font-medium mb-1 text-gray-700">输出数据:</h4>
+                        <h4 className="font-medium mb-1 text-gray-700">Output Data:</h4>
                         <pre className="bg-white p-2 rounded border overflow-x-auto text-gray-800">
                           {JSON.stringify(executionResult.result.outputs, null, 2)}
                         </pre>
@@ -428,14 +428,14 @@ export default function ConsolePage() {
                     
                     {executionResult.result.error && (
                       <div>
-                        <h4 className="font-medium mb-1 text-red-700">错误信息:</h4>
+                        <h4 className="font-medium mb-1 text-red-700">Error Message:</h4>
                         <p className="text-red-600">{executionResult.result.error}</p>
                       </div>
                     )}
                     
                     {executionResult.result.execution_id && (
                       <div className="mt-2">
-                        <span className="text-xs text-gray-500">执行ID: {executionResult.result.execution_id}</span>
+                        <span className="text-xs text-gray-500">Execution ID: {executionResult.result.execution_id}</span>
                       </div>
                     )}
                   </div>
@@ -444,7 +444,7 @@ export default function ConsolePage() {
               
               {executionResult.error && (
                 <div>
-                  <h3 className="text-sm font-medium text-red-700 mb-2">执行错误</h3>
+                  <h3 className="text-sm font-medium text-red-700 mb-2">Execution Error</h3>
                   <div className="bg-red-50 border border-red-200 p-3 rounded text-sm">
                     <p className="text-red-600">{executionResult.error}</p>
                   </div>
@@ -457,19 +457,19 @@ export default function ConsolePage() {
                 onClick={() => setShowResult(false)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
               >
-                关闭
+                Close
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 添加API Key创建成功的模态对话框 */}
+      {/* API Key creation success modal dialog */}
       {showKeyModal && newCreatedKey && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">API密钥创建成功</h3>
-            <p className="text-sm text-red-600 mb-4">请立即复制您的API密钥，它只会显示一次！</p>
+            <h3 className="text-lg font-semibold mb-4">API Key Created Successfully</h3>
+            <p className="text-sm text-red-600 mb-4">Please copy your API key immediately, it will only be shown once!</p>
             
             <div className="bg-gray-50 p-3 rounded border mb-4">
               <code className="block font-mono text-sm break-all">{newCreatedKey.key}</code>
@@ -480,13 +480,13 @@ export default function ConsolePage() {
                 onClick={() => copyKeyToClipboard(newCreatedKey.key)}
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
               >
-                复制密钥
+                Copy Key
               </button>
               <button
                 onClick={() => setShowKeyModal(false)}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
               >
-                关闭
+                Close
               </button>
             </div>
           </div>

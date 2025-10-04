@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronUp, Zap, ExternalLink } from 'lucide-react';
 import { Toolkit, Tool } from '@/lib/types';
 import ToolExecutionDialog from './tool-execution-dialog';
+import ToolkitPlayground from './toolkit-playground';
 
 interface ToolkitCardProps {
   toolkit: Toolkit;
@@ -20,9 +22,11 @@ export default function ToolkitCard({
   onRevokeAccount, 
   onExecuteTool 
 }: ToolkitCardProps) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(false);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
@@ -58,7 +62,7 @@ export default function ToolkitCard({
                     ? 'bg-green-100 text-green-800' 
                     : 'bg-gray-100 text-gray-800'
                 }`}>
-                  {toolkit.status === 'active' ? '活跃' : '未激活'}
+                  {toolkit.status === 'active' ? 'Active' : 'Inactive'}
                 </span>
               </div>
             </div>
@@ -66,30 +70,40 @@ export default function ToolkitCard({
               <p className="text-sm text-gray-600 mt-2 line-clamp-2">{toolkit.description}</p>
             )}
           </div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-          >
-            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsPlaygroundOpen(true)}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors group"
+              title="Open Tool Playground"
+            >
+              <Zap size={18} className="group-hover:text-blue-600" />
+            </button>
+            <button
+              onClick={() => router.push(`/toolkits/${encodeURIComponent(toolkit.name)}`)}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors group"
+              title="View Toolkit Details"
+            >
+              <ExternalLink size={18} className="group-hover:text-blue-600" />
+            </button>
+          </div>
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4 mb-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{toolkit.tools?.length || 0}</div>
-              <div className="text-xs text-gray-500 mt-1">工具数量</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{connectedAccounts.length}</div>
-              <div className="text-xs text-gray-500 mt-1">连接账户</div>
+              <div className="text-xs text-gray-500 mt-1">Tools</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">{connectedAccounts.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Connected Accounts</div>
             </div>
           </div>
         </div>
         
         <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
-          <span>版本: {toolkit.version || 'N/A'}</span>
-          <span>更新: {formatDate(toolkit.updated_at)}</span>
+          <span>Version: {toolkit.version || 'N/A'}</span>
+        <span>Updated: {formatDate(toolkit.updated_at)}</span>
         </div>
 
         {toolkit.tags && toolkit.tags.length > 0 && (
@@ -107,10 +121,10 @@ export default function ToolkitCard({
           </div>
         )}
 
-        {/* 连接账户信息 */}
-        {connectedAccounts.length > 0 && (
-          <div className="mt-4">
-            <h5 className="text-sm font-medium text-gray-900 mb-2">已连接账户</h5>
+        {/* Connected accounts information */}
+          {connectedAccounts.length > 0 && (
+            <div className="mb-4">
+              <h5 className="text-sm font-medium text-gray-900 mb-2">Connected Accounts</h5>
             <div className="space-y-2">
               {connectedAccounts.map((account) => (
                 <div key={account.id} className="flex items-center justify-between p-2 bg-green-50 rounded">
@@ -119,7 +133,7 @@ export default function ToolkitCard({
                     onClick={() => onRevokeAccount(account.id)}
                     className="text-xs text-red-600 hover:text-red-800"
                   >
-                    撤销
+                    Revoke
                   </button>
                 </div>
               ))}
@@ -127,14 +141,14 @@ export default function ToolkitCard({
           </div>
         )}
 
-        {/* 连接按钮 */}
+        {/* Connect button */}
         {connectedAccounts.length === 0 && (
           <div className="mt-4">
             <button
               onClick={onConnect}
               className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
             >
-              连接 {toolkit.name}
+              Connect {toolkit.name}
             </button>
           </div>
         )}
@@ -143,7 +157,7 @@ export default function ToolkitCard({
       {expanded && toolkit.tools && toolkit.tools.length > 0 && (
         <div className="border-t border-gray-200">
           <div className="p-6">
-            <h4 className="text-md font-medium text-gray-900 mb-4">可用工具</h4>
+            <h4 className="text-md font-medium text-gray-900 mb-4">Available Tools</h4>
             <div className="space-y-3">
               {toolkit.tools.map((tool) => (
                 <div
@@ -159,11 +173,11 @@ export default function ToolkitCard({
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {tool.status === 'available' ? '可用' : '不可用'}
+                        {tool.status === 'available' ? 'Available' : 'Unavailable'}
                       </span>
                       {tool.requires_connection && (
                         <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">
-                          需要连接
+                          Connection Required
                         </span>
                       )}
                     </div>
@@ -171,13 +185,13 @@ export default function ToolkitCard({
                       <p className="text-sm text-gray-600 mt-1">{tool.description}</p>
                     )}
                     <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                      <span>版本: {tool.version || 'N/A'}</span>
-                      {tool.category && <span>分类: {tool.category}</span>}
+                      <span>Version: {tool.version || 'N/A'}</span>
+                      {tool.category && <span>Category: {tool.category}</span>}
                       <span>Slug: {tool.slug}</span>
                     </div>
                   </div>
                   <div className="text-sm text-blue-600">
-                    点击测试
+                    Test Tool
                   </div>
                 </div>
               ))}
@@ -191,6 +205,13 @@ export default function ToolkitCard({
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         onExecute={handleToolExecution}
+      />
+      
+      <ToolkitPlayground
+        toolkit={toolkit}
+        isOpen={isPlaygroundOpen}
+        onClose={() => setIsPlaygroundOpen(false)}
+        onExecuteTool={onExecuteTool}
       />
     </div>
   );

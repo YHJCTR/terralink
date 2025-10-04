@@ -77,7 +77,7 @@ export default function Toolbar() {
               pathname === '/toolkits' ? 'text-blue-700 font-bold' : 'text-gray-700'
             }`}
           >
-            工具包
+            Toolkits
           </Link>
           <Link 
             href="/my-toolkits" 
@@ -85,7 +85,7 @@ export default function Toolbar() {
               pathname === '/my-toolkits' ? 'text-blue-700 font-bold' : 'text-gray-700'
             }`}
           >
-            我的工具包
+            My Toolkits
           </Link>
           <Link 
             href="/app" 
@@ -93,7 +93,7 @@ export default function Toolbar() {
               pathname === '/app' ? 'text-blue-700 font-bold' : 'text-gray-700'
             }`}
           >
-            控制台
+            Console
           </Link>
           <Link 
             href="/execution-history" 
@@ -101,7 +101,7 @@ export default function Toolbar() {
               pathname === '/execution-history' ? 'text-blue-700 font-bold' : 'text-gray-700'
             }`}
           >
-            执行记录
+            Execution History
           </Link>
         </nav>
       </div>

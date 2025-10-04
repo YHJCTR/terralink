@@ -27,7 +27,7 @@ async function forward(req: NextRequest, path: string[]) {
     cache: "no-store",
   });
   
-  // 特殊处理204状态码（No Content）
+  // Special handling for 204 status code (No Content)
   if (r.status === 204) {
     return new NextResponse(null, { 
       status: 204,
