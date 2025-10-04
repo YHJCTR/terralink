@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { TL } from "@/lib/terralink";
 
 interface OAuthProvider {
@@ -19,8 +18,6 @@ interface OAuthLoginProps {
 export default function OAuthLogin({ onError }: OAuthLoginProps) {
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authLoading, setAuthLoading] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -39,8 +36,6 @@ export default function OAuthLogin({ onError }: OAuthLoginProps) {
   }, [onError]);
 
   const handleOAuthLogin = async (provider: string) => {
-    setAuthLoading(provider);
-    
     try {
       const redirectUri = `${window.location.origin}/auth/callback`;
       const response = await TL.initiateOAuth(provider, redirectUri);
@@ -49,70 +44,11 @@ export default function OAuthLogin({ onError }: OAuthLoginProps) {
       sessionStorage.setItem('oauth_provider', provider);
       sessionStorage.setItem('oauth_state', response.state);
       
-      // Create hidden iframe for OAuth authentication
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = response.auth_url;
-      document.body.appendChild(iframe);
-
-      // Listen for messages from the iframe
-      const handleMessage = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) {
-          return;
-        }
-
-        if (event.data.type === 'OAUTH_SUCCESS') {
-          window.removeEventListener('message', handleMessage);
-          document.body.removeChild(iframe);
-          
-          try {
-            // Set authentication cookie
-            const cookieResponse = await fetch("/api/auth/oauth/callback", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ token: event.data.token })
-            });
-            
-            if (!cookieResponse.ok) {
-              throw new Error(`Failed to set authentication cookie: ${cookieResponse.status}`);
-            }
-            
-            // Clean up temporary data
-            sessionStorage.removeItem("oauth_provider");
-            sessionStorage.removeItem("oauth_state");
-            
-            // Redirect to console
-            router.push("/app");
-          } catch (error) {
-            console.error("Failed to complete authentication:", error);
-            onError(error instanceof Error ? error.message : "Authentication failed");
-          } finally {
-            setAuthLoading(null);
-          }
-        } else if (event.data.type === 'OAUTH_ERROR') {
-          window.removeEventListener('message', handleMessage);
-          document.body.removeChild(iframe);
-          setAuthLoading(null);
-          onError(event.data.error || "OAuth authentication failed");
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-
-      // Set a timeout to handle cases where the iframe doesn't respond
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          window.removeEventListener('message', handleMessage);
-          document.body.removeChild(iframe);
-          setAuthLoading(null);
-          onError("Authentication timeout. Please try again.");
-        }
-      }, 60000); // 60 second timeout
-
+      // Redirect to OAuth provider
+      window.location.href = response.auth_url;
     } catch (error) {
       console.error("OAuth login error:", error);
       onError(error instanceof Error ? error.message : "OAuth login failed");
-      setAuthLoading(null);
     }
   };
 
@@ -182,26 +118,10 @@ export default function OAuthLogin({ onError }: OAuthLoginProps) {
         <button
           key={provider.id}
           onClick={() => handleOAuthLogin(provider.name)}
-          disabled={authLoading !== null}
-          className={`w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-            authLoading === provider.name
-              ? 'bg-blue-50 text-blue-700 border-blue-300'
-              : authLoading !== null
-              ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
-          }`}
+          className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
-          {authLoading === provider.name ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span className="ml-2">Connecting to {provider.display_name}...</span>
-            </>
-          ) : (
-            <>
-              {getProviderIcon(provider.name)}
-              <span className="ml-2">Sign in with {provider.display_name}</span>
-            </>
-          )}
+          {getProviderIcon(provider.name)}
+          <span className="ml-2">Sign in with {provider.display_name}</span>
         </button>
       ))}
     </div>
