@@ -17,10 +17,9 @@ async function forward(req: NextRequest, path: string[]) {
     method: req.method,
     headers: {
       "content-type": req.headers.get("content-type") || "application/json",
-      // Add X-API-Key header for backend authentication
+      // Only use Authorization header for JWT authentication
       ...(token ? { 
-        "authorization": `Bearer ${token}`,
-        "X-API-Key": token  // Backend expects this header
+        "authorization": `Bearer ${token}`
       } : {}),
     },
     body: ["GET","HEAD"].includes(req.method) ? undefined : await req.text(),
