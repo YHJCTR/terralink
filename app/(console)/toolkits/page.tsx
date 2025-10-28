@@ -94,9 +94,9 @@ export default function ToolkitsPage() {
         if (a.connectionCount > 0 && b.connectionCount === 0) return -1
         if (a.connectionCount === 0 && b.connectionCount > 0) return 1
         
-        // Second priority: active status
-        if (a.status === 'active' && b.status !== 'active') return -1
-        if (a.status !== 'active' && b.status === 'active') return 1
+        // Second priority: active status (non-inactive)
+        if (a.status !== 'inactive' && b.status === 'inactive') return -1
+        if (a.status === 'inactive' && b.status !== 'inactive') return 1
         
         // Third priority: alphabetical by name
         return a.name.localeCompare(b.name)
@@ -161,8 +161,8 @@ export default function ToolkitsPage() {
 
     // Status filter
     const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'active' && toolkit.status === 'active') ||
-      (statusFilter === 'inactive' && toolkit.status !== 'active') ||
+      (statusFilter === 'active' && toolkit.status !== 'inactive') ||
+      (statusFilter === 'inactive' && toolkit.status === 'inactive') ||
       (statusFilter === 'connected' && toolkit.connectionCount > 0)
 
     return matchesSearch && matchesStatus
@@ -202,7 +202,7 @@ export default function ToolkitsPage() {
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <div className="text-2xl font-bold text-purple-600">
-                  {toolkits.filter(t => t.status === 'active').length}
+                  {toolkits.filter(t => t.status !== 'inactive').length}
                 </div>
                 <div className="text-sm text-gray-600 mt-1">Active</div>
               </div>

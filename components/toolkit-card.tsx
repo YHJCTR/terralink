@@ -64,11 +64,11 @@ export default function ToolkitCard({
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">{toolkit.name}</h3>
                 <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                  toolkit.status === 'active' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-gray-100 text-gray-800'
+                  toolkit.status === 'inactive' 
+                    ? 'bg-gray-100 text-gray-800' 
+                    : 'bg-green-100 text-green-800'
                 }`}>
-                  {toolkit.status === 'active' ? 'Active' : 'Inactive'}
+                  {toolkit.status === 'inactive' ? 'Inactive' : 'Active'}
                 </span>
               </div>
             </div>
