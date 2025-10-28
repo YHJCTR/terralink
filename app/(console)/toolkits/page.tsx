@@ -253,7 +253,7 @@ export default function ToolkitsPage() {
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive' | 'connected')}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-w-[120px]"
+                    className="border border-gray-300 text-gray-500 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-w-[120px]"
                   >
                     <option value="all">All Status</option>
                     <option value="connected">Connected</option>
