@@ -300,7 +300,7 @@ export default function ConsolePage() {
         {activeTab === "api-keys" && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Create New API Key</h2>
+              <h2 className="text-lg font-semibold mb-4 text-gray-500">Create New API Key</h2>
               <div className="flex gap-4">
                 <input
                   type="text"
@@ -349,7 +349,7 @@ export default function ConsolePage() {
         {activeTab === "oauth-accounts" && (
           <div className="space-y-4">
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">OAuth Account Management</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-500">OAuth Account Management</h3>
               {oauthAccounts.length === 0 ? (
                 <p className="text-gray-500">No OAuth accounts</p>
               ) : (
