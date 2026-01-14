@@ -10,6 +10,8 @@ export default function Hero() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cooldownUntilMs, setCooldownUntilMs] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const router = useRouter();
 
@@ -22,8 +24,23 @@ export default function Hero() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  useEffect(() => {
+    if (!cooldownUntilMs) return;
+    const tick = () => {
+      const remainingMs = cooldownUntilMs - Date.now();
+      const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+      setCooldownSeconds(remainingSeconds);
+      if (remainingSeconds === 0) setCooldownUntilMs(null);
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [cooldownUntilMs]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    if (cooldownUntilMs && Date.now() < cooldownUntilMs) return;
     setLoading(true);
     setError("");
 
@@ -37,8 +54,8 @@ export default function Hero() {
         });
         
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Login failed");
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData?.detail || errorData?.message || "Login failed");
         }
         
         // Login successful, BFF has set httpOnly cookie
@@ -52,8 +69,15 @@ export default function Hero() {
         });
         
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Registration failed");
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 429) {
+            const retryAfterHeader = response.headers.get("retry-after");
+            const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+            const seconds = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : 10;
+            setCooldownUntilMs(Date.now() + seconds * 1000);
+            throw new Error(`请求太频繁（429），请 ${seconds}s 后再试`);
+          }
+          throw new Error(errorData?.detail || errorData?.message || "Registration failed");
         }
         
         setIsLogin(true);
@@ -203,7 +227,7 @@ export default function Hero() {
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || cooldownSeconds > 0}
                   className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 text-white py-3 px-6 rounded-lg hover:from-blue-600 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-lg"
                 >
                   {loading ? (
@@ -211,6 +235,8 @@ export default function Hero() {
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
                       Connecting...
                     </div>
+                  ) : cooldownSeconds > 0 ? (
+                    `请稍候 ${cooldownSeconds}s`
                   ) : (
                     isLogin ? "Access Dashboard" : "Join Mission"
                   )}

@@ -13,11 +13,23 @@ export async function POST(req: Request) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(platformBody),
+    cache: "no-store",
   });
   
-  const data = await r.json();
-  return new Response(JSON.stringify(data), { 
-    status: r.status, 
-    headers: { "content-type": "application/json" }
+  const raw = await r.text();
+  let data: any = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = { detail: raw || r.statusText };
+  }
+
+  const headers = new Headers({ "content-type": "application/json" });
+  const retryAfter = r.headers.get("retry-after");
+  if (retryAfter) headers.set("retry-after", retryAfter);
+
+  return new Response(JSON.stringify(data), {
+    status: r.status,
+    headers,
   });
 }
