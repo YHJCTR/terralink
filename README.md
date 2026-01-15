@@ -134,7 +134,3 @@ Ensure the Terrabox backend is running and accessible. The frontend expects:
 3. Make your changes
 4. Run tests and linting
 5. Submit a pull request
-
-## License
-
-This project is the Terrabox frontend.
