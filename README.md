@@ -1,21 +1,12 @@
-# Terralink Frontend
+# Terrabox Frontend
 
-A modern web interface for the Terralink Platform, built with Next.js 14, React 18, and TypeScript.
-
-## Features
-
-- 🔐 OAuth authentication (GitHub, Google)
-- 🛠️ Toolkit management and execution
-- 🔑 API key management
-- 📊 Execution history tracking
-- 🎨 Modern UI with Tailwind CSS
-- 🔒 Secure JWT-based authentication
+A modern web interface for the Terrabox Platform, built with Next.js 14, React 18, and TypeScript.
 
 ## Prerequisites
 
 - Node.js 18+ 
 - npm or yarn package manager
-- Terralink Platform backend running (default: http://localhost:8000)
+- Terrabox backend running (default: http://localhost:8000)
 
 ## Installation
 
@@ -38,7 +29,7 @@ A modern web interface for the Terralink Platform, built with Next.js 14, React 
    
    Then edit `.env.local` to match your setup:
    ```bash
-   # Terralink Platform API Base URL
+   # Terrabox API Base URL
    NEXT_PUBLIC_TERRALINK_BASE_URL=http://localhost:8000
    
    # JWT Cookie Name (optional, defaults to "ef_session")
@@ -96,19 +87,11 @@ terralink/
 
 ### Backend Requirements
 
-Ensure the Terralink Platform backend is running and accessible. The frontend expects:
+Ensure the Terrabox backend is running and accessible. The frontend expects:
 
 - OAuth providers endpoint: `GET /v1/oauth/providers`
 - Authentication endpoints: `/v1/login`, `/v1/register`
 - API proxy endpoints under `/v1/`
-
-## Authentication
-
-The application supports multiple authentication methods:
-
-1. **Email/Password** - Traditional login
-2. **OAuth** - GitHub and Google integration
-3. **API Keys** - For programmatic access
 
 ## Building for Production
 
@@ -154,4 +137,4 @@ The application supports multiple authentication methods:
 
 ## License
 
-This project is part of the Terralink Platform ecosystem.
+This project is the Terrabox frontend.
