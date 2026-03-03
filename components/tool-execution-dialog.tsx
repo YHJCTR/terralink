@@ -22,6 +22,7 @@ export default function ToolExecutionDialog({
   const [executionResult, setExecutionResult] = useState<any>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [fileParams, setFileParams] = useState<Record<string, File[]>>({});
 
   if (!isOpen || !tool) return null;
 
@@ -40,7 +41,19 @@ export default function ToolExecutionDialog({
     
     required.forEach((paramKey: string) => {
       const value = parameters[paramKey];
-      if (value === undefined || value === null || value === '') {
+
+      const isImageKey =
+        paramKey === 'image' ||
+        paramKey === 'images' ||
+        paramKey === 'image_path' ||
+        paramKey === 'image_paths';
+
+      const isFileSatisfied =
+        isImageKey &&
+        Array.isArray(fileParams[paramKey]) &&
+        fileParams[paramKey].length > 0;
+
+      if (!isFileSatisfied && (value === undefined || value === null || value === '')) {
         const param = tool.parameters.properties?.[paramKey];
         errors.push(`${paramKey}${param?.description ? ` (${param.description})` : ''} is required`);
       }
@@ -70,6 +83,33 @@ export default function ToolExecutionDialog({
         return acc;
       }, {} as Record<string, any>);
       
+      const imageKeys = ['image', 'images', 'image_path', 'image_paths'] as const;
+      const hasFiles = imageKeys.some((k) => (fileParams[k]?.length ?? 0) > 0);
+      if (hasFiles) {
+        const form = new FormData();
+      
+        const { image, images, image_path, image_paths, ...rest } = cleanedParameters;
+        form.append('inputs', JSON.stringify(rest));
+      
+        const files: File[] = imageKeys.flatMap((k) => fileParams[k] || []);
+        files.forEach((f) => form.append('files', f));
+      
+        const resp = await fetch(
+          `/api/proxy/v1/gui/tools/${encodeURIComponent(tool.slug)}/execute-multipart`,
+          { method: 'POST', body: form },
+        );
+      
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(text || `HTTP ${resp.status}`);
+        }
+      
+        const result = await resp.json();
+        setExecutionResult(result);
+        setShowResult(true);
+        return;
+      } 
+
       const result = await onExecute(tool.slug, cleanedParameters);
       setExecutionResult(result);
       setShowResult(true);
@@ -93,6 +133,11 @@ export default function ToolExecutionDialog({
   const renderParameterInput = (key: string, param: any) => {
     const value = parameters[key] ?? param.default ?? '';
     const isRequired = tool?.parameters?.required?.includes(key) || false;
+    const isImageParam =
+      key === 'image' ||
+      key === 'images' ||
+      key === 'image_path' ||
+      key === 'image_paths';
     
     const handleChange = (newValue: any) => {
       setParameters(prev => ({
@@ -104,6 +149,87 @@ export default function ToolExecutionDialog({
     const baseInputClass = "w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-colors text-gray-900";
     const inputClass = `${baseInputClass} ${isRequired && !value ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`;
 
+    if (isImageParam) {
+      const multiple = key === 'images' || key === 'image_paths';
+      const files = fileParams[key] || [];
+    
+      const handleFilesChange = (selected: File[]) => {
+        setFileParams((prev) => ({ ...prev, [key]: selected }));
+        handleChange(undefined);
+      };
+    
+      const handleRemoveFile = (index: number) => {
+        const next = [...files];
+        next.splice(index, 1);
+        handleFilesChange(next);
+      };
+    
+      return (
+        <div className="space-y-3">
+          <div className="inline-flex items-center">
+            <label className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-blue-700 cursor-pointer transition-colors">
+              <span className="mr-2">
+                {multiple ? 'Upload Images' : 'Upload Image'}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple={multiple}
+                className="hidden"
+                onChange={(e) => {
+                  const selected = Array.from(e.target.files || []);
+                  handleFilesChange(selected);
+                }}
+              />
+            </label>
+          </div>
+
+          {files.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {files.map((file, idx) => (
+                <div
+                  key={`${file.name}-${idx}`}
+                  className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
+                >
+                  <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={file.name}
+                      className="w-full h-full object-cover"
+                      onLoad={(e) => {
+                        URL.revokeObjectURL((e.target as HTMLImageElement).src);
+                      }}
+                    />
+                  </div>
+    
+                  <div className="px-2 py-1 text-xs text-gray-700 truncate">
+                    {file.name}
+                  </div>
+    
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(idx)}
+                    className="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-black/60 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Remove image"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+    
+          {files.length === 0 && (
+            <p className="text-xs text-gray-500">
+              {multiple
+                ? 'No images selected. Click "Upload Images" to choose multiple files.'
+                : 'No image selected. Click "Upload Image" to choose a file.'}
+            </p>
+          )}
+        </div>
+      );
+    }
+    
     switch (param.type) {
       case 'string':
         // Check if there are enum values
@@ -252,7 +378,19 @@ export default function ToolExecutionDialog({
                 <h3 className="text-lg font-medium text-gray-900">Parameter Configuration</h3>
                 {Object.entries(tool.parameters.properties).map(([key, param]: [string, any]) => {
                   const isRequired = tool.parameters.required?.includes(key);
-                  const hasValue = parameters[key] !== undefined && parameters[key] !== null && parameters[key] !== '';
+                  const isImageKey =
+                    key === 'image' ||
+                    key === 'images' ||
+                    key === 'image_path' ||
+                    key === 'image_paths';
+                  const hasFileValue =
+                    isImageKey &&
+                    Array.isArray(fileParams[key]) &&
+                    fileParams[key].length > 0;
+                  
+                  const hasValue =
+                    hasFileValue ||
+                    (parameters[key] !== undefined && parameters[key] !== null && parameters[key] !== '');
                   
                   return (
                     <div key={key} className="space-y-2">

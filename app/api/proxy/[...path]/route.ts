@@ -13,29 +13,33 @@ export async function PATCH(req: NextRequest, ctx: any) { return forward(req, ct
 async function forward(req: NextRequest, path: string[]) {
   const token = cookies().get(JWT_COOKIE)?.value;
   const url = `${BASE}/${path.join("/")}${req.nextUrl.search || ""}`;
+
+
+  const hasBody = !["GET", "HEAD"].includes(req.method);
+  const contentType = req.headers.get("content-type") || undefined;
+  const body = hasBody ? await req.arrayBuffer() : undefined;
+
   const r = await fetch(url, {
     method: req.method,
     headers: {
-      "content-type": req.headers.get("content-type") || "application/json",
-      // Only use Authorization header for JWT authentication
+      ...(contentType ? { "content-type": contentType } : {}),
       ...(token ? { 
         "authorization": `Bearer ${token}`
       } : {}),
     },
-    body: ["GET","HEAD"].includes(req.method) ? undefined : await req.text(),
+    body: body as any,
     cache: "no-store",
   });
-  
-  // Special handling for 204 status code (No Content)
+
   if (r.status === 204) {
     return new NextResponse(null, { 
       status: 204,
       headers: { "content-type": r.headers.get("content-type") || "application/json" }
     });
   }
-  
-  const body = await r.text();
-  return new NextResponse(body, { 
+
+  const respBody = await r.text();
+  return new NextResponse(respBody, { 
     status: r.status, 
     headers: { "content-type": r.headers.get("content-type") || "application/json" }
   });
