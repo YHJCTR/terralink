@@ -125,6 +125,7 @@ export default function ToolExecutionDialog({
   const handleClose = () => {
     onClose();
     setParameters({});
+    setFileParams({}); // Reset file parameters to avoid file accumulation
     setExecutionResult(null);
     setExecutionError(null);
     setShowResult(false);
@@ -154,7 +155,14 @@ export default function ToolExecutionDialog({
       const files = fileParams[key] || [];
     
       const handleFilesChange = (selected: File[]) => {
-        setFileParams((prev) => ({ ...prev, [key]: selected }));
+        // Clear all image-related keys to avoid file accumulation
+        const newFileParams: Record<string, File[]> = {};
+        ['image', 'images', 'image_path', 'image_paths'].forEach(imageKey => {
+          if (imageKey === key) {
+            newFileParams[imageKey] = selected;
+          }
+        });
+        setFileParams(newFileParams);
         handleChange(undefined);
       };
     
