@@ -312,6 +312,26 @@ export const TL = {
   getToolExecutionDetail: (executionId: string) =>
     api(`/api/proxy/v1/gui/analytics/executions/${encodeURIComponent(executionId)}`),
 
+  // Agent chat
+  agentChat: async (message: string, sessionId: string | null, files: File[] = []) => {
+    const token = getAuthTokenClient();
+    const form = new FormData();
+    form.append("message", message);
+    if (sessionId) form.append("session_id", sessionId);
+    files.forEach((f) => form.append("files", f));
+    const r = await fetch("/api/proxy/v1/gui/agent/chat", {
+      method: "POST",
+      body: form,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data?.detail || r.statusText);
+    return data as { response: string; session_id: string };
+  },
+
+  agentClearSession: (sessionId: string) =>
+    api(`/api/proxy/v1/gui/agent/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" }),
+
   getUserToolStats: (params?: {
     start_date?: string;
     end_date?: string;

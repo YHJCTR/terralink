@@ -95,13 +95,21 @@ export default function Toolbar() {
           >
             Console
           </Link>
-          <Link 
-            href="/execution-history" 
+          <Link
+            href="/execution-history"
             className={`text-sm font-medium transition-colors hover:text-blue-600 ${
               pathname === '/execution-history' ? 'text-blue-700 font-bold' : 'text-gray-700'
             }`}
           >
             Execution History
+          </Link>
+          <Link
+            href="/agent"
+            className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+              pathname === '/agent' ? 'text-blue-700 font-bold' : 'text-gray-700'
+            }`}
+          >
+            Agent
           </Link>
         </nav>
       </div>
