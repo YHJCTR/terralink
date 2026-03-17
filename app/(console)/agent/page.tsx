@@ -8,12 +8,14 @@ const STORAGE_KEY = "terrabox_agent_session";
 interface Message {
   role: "user" | "assistant";
   content: string;
-  images?: string[]; // blob: preview URLs — ephemeral, stripped before persisting
+  thinking?: string;   // content inside <think> tags, if any
+  images?: string[];   // blob: preview URLs — ephemeral, stripped before persisting
 }
 
 interface PersistedMessage {
   role: "user" | "assistant";
   content: string;
+  thinking?: string;
 }
 
 interface PersistedState {
@@ -40,21 +42,66 @@ function saveState(state: PersistedState) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// ThinkingBlock — collapsible gray block for <think> content
+// ---------------------------------------------------------------------------
+
+function ThinkingBlock({ content, streaming }: { content: string; streaming: boolean }) {
+  return (
+    <details
+      open={streaming}
+      className="mb-1 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden"
+    >
+      <summary className="cursor-pointer select-none px-3 py-1.5 text-xs text-gray-400 hover:text-gray-500 list-none flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+        思考过程
+      </summary>
+      <div className="px-3 pb-3 pt-1 text-xs text-gray-400 font-mono whitespace-pre-wrap leading-relaxed">
+        {content}
+      </div>
+    </details>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
 export default function AgentPage() {
-  const initial = loadState();
-  const [messages, setMessages] = useState<Message[]>(initial.messages);
+  // Always start with empty state so server and client render identically.
+  // Load persisted state from localStorage only after mount (useEffect),
+  // which avoids the React hydration mismatch caused by server having no
+  // access to localStorage while the client does.
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(initial.sessionId);
-  const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingThinking, setStreamingThinking] = useState("");
+  const [streamingResponse, setStreamingResponse] = useState("");
+
+  // Refs so onDone callback always reads current accumulated text
+  const thinkingRef = useRef("");
+  const responseRef = useRef("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load persisted session from localStorage after first mount
+  useEffect(() => {
+    const saved = loadState();
+    if (saved.sessionId) setSessionId(saved.sessionId);
+    if (saved.messages.length > 0) setMessages(saved.messages);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist session whenever messages or sessionId change (strip ephemeral images)
   useEffect(() => {
     saveState({
       sessionId,
-      messages: messages.map(({ role, content }) => ({ role, content })),
+      messages: messages.map(({ role, content, thinking }) => ({ role, content, thinking })),
     });
   }, [sessionId, messages]);
 
@@ -71,32 +118,66 @@ export default function AgentPage() {
   const handleSend = async () => {
     const text = input.trim();
     if (!text && files.length === 0) return;
-    if (loading) return;
+    if (isStreaming) return;
 
     const userMsg: Message = { role: "user", content: text, images: previewUrls };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     const sentFiles = [...files];
-    // files intentionally kept — images persist in the input area after sending
-    setLoading(true);
+    setIsStreaming(true);
+    setStreamingThinking("");
+    setStreamingResponse("");
+    thinkingRef.current = "";
+    responseRef.current = "";
 
-    // Scroll to bottom
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
-    try {
-      const res = await TL.agentChat(text, sessionId, sentFiles);
-      setSessionId(res.session_id);
-      setMessages((prev) => [...prev, { role: "assistant", content: res.response }]);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Error: ${msg}` },
-      ]);
-    } finally {
-      setLoading(false);
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-    }
+    await TL.agentChatStream(
+      text,
+      sessionId,
+      sentFiles,
+      (token) => {
+        thinkingRef.current += token;
+        setStreamingThinking((prev) => prev + token);
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      },
+      (token) => {
+        responseRef.current += token;
+        setStreamingResponse((prev) => prev + token);
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      },
+      (sid) => {
+        setSessionId(sid);
+        const finalThinking = thinkingRef.current;
+        const finalResponse = responseRef.current;
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: finalResponse,
+            thinking: finalThinking || undefined,
+          },
+        ]);
+        setStreamingThinking("");
+        setStreamingResponse("");
+        thinkingRef.current = "";
+        responseRef.current = "";
+        setIsStreaming(false);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      },
+      (errMsg) => {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Error: ${errMsg}` },
+        ]);
+        setStreamingThinking("");
+        setStreamingResponse("");
+        thinkingRef.current = "";
+        responseRef.current = "";
+        setIsStreaming(false);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      },
+    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -138,7 +219,7 @@ export default function AgentPage() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50">
-        {messages.length === 0 && (
+        {messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm gap-2">
             <div className="text-4xl">🤖</div>
             <p>Ask the Agent anything. It will automatically choose and chain tools to answer.</p>
@@ -150,36 +231,52 @@ export default function AgentPage() {
             key={i}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
-            <div
-              className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-800 border border-gray-200"
-              }`}
-            >
-              {/* Uploaded image thumbnails */}
-              {msg.images && msg.images.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {msg.images.map((url, j) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={j}
-                      src={url}
-                      alt="upload"
-                      className="h-20 w-20 object-cover rounded-lg border"
-                    />
-                  ))}
+            {msg.role === "assistant" ? (
+              <div className="max-w-[75%]">
+                {msg.thinking && (
+                  <ThinkingBlock content={msg.thinking} streaming={false} />
+                )}
+                <div className="rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm bg-white text-gray-800 border border-gray-200">
+                  {msg.content}
                 </div>
-              )}
-              {msg.content}
-            </div>
+              </div>
+            ) : (
+              <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm bg-blue-600 text-white">
+                {msg.images && msg.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {msg.images.map((url, j) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={j}
+                        src={url}
+                        alt="upload"
+                        className="h-20 w-20 object-cover rounded-lg border"
+                      />
+                    ))}
+                  </div>
+                )}
+                {msg.content}
+              </div>
+            )}
           </div>
         ))}
 
-        {loading && (
+        {/* Live streaming bubble */}
+        {isStreaming && (
           <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-500 shadow-sm">
-              <span className="animate-pulse">Agent is thinking…</span>
+            <div className="max-w-[75%]">
+              {streamingThinking && (
+                <ThinkingBlock content={streamingThinking} streaming />
+              )}
+              <div className="rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm bg-white text-gray-800 border border-gray-200">
+                {streamingResponse || (
+                  <span className="inline-flex gap-1">
+                    <span className="animate-bounce" style={{ animationDelay: "0ms" }}>·</span>
+                    <span className="animate-bounce" style={{ animationDelay: "150ms" }}>·</span>
+                    <span className="animate-bounce" style={{ animationDelay: "300ms" }}>·</span>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -249,7 +346,7 @@ export default function AgentPage() {
           {/* Send button */}
           <button
             onClick={handleSend}
-            disabled={loading || (!input.trim() && files.length === 0)}
+            disabled={isStreaming || (!input.trim() && files.length === 0)}
             className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

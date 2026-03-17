@@ -32,15 +32,27 @@ async function forward(req: NextRequest, path: string[]) {
   });
 
   if (r.status === 204) {
-    return new NextResponse(null, { 
+    return new NextResponse(null, {
       status: 204,
       headers: { "content-type": r.headers.get("content-type") || "application/json" }
     });
   }
 
+  // Pass SSE streams straight through without buffering
+  if (r.headers.get("content-type")?.includes("text/event-stream")) {
+    return new NextResponse(r.body, {
+      status: r.status,
+      headers: {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        "x-accel-buffering": "no",
+      },
+    });
+  }
+
   const respBody = await r.text();
-  return new NextResponse(respBody, { 
-    status: r.status, 
+  return new NextResponse(respBody, {
+    status: r.status,
     headers: { "content-type": r.headers.get("content-type") || "application/json" }
   });
 }

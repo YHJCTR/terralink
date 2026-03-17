@@ -329,6 +329,63 @@ export const TL = {
     return data as { response: string; session_id: string };
   },
 
+  agentChatStream: async (
+    message: string,
+    sessionId: string | null,
+    files: File[],
+    onThinking: (token: string) => void,
+    onResponse: (token: string) => void,
+    onDone: (sessionId: string) => void,
+    onError: (msg: string) => void,
+  ): Promise<void> => {
+    try {
+      const token = getAuthTokenClient();
+      const form = new FormData();
+      form.append("message", message);
+      if (sessionId) form.append("session_id", sessionId);
+      files.forEach((f) => form.append("files", f));
+
+      const r = await fetch("/api/proxy/v1/gui/agent/chat/stream", {
+        method: "POST",
+        body: form,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!r.ok || !r.body) {
+        onError(`Server error ${r.status}: ${r.statusText}`);
+        return;
+      }
+
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let lineBuf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        lineBuf += decoder.decode(value, { stream: true });
+        // SSE events are separated by double newlines
+        const parts = lineBuf.split("\n\n");
+        lineBuf = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.type === "thinking") onThinking(evt.token);
+            else if (evt.type === "response") onResponse(evt.token);
+            else if (evt.type === "done") onDone(evt.session_id);
+            else if (evt.type === "error") onError(evt.message);
+          } catch {
+            // skip malformed SSE line
+          }
+        }
+      }
+    } catch (err: unknown) {
+      onError(err instanceof Error ? err.message : "Network error");
+    }
+  },
+
   agentClearSession: (sessionId: string) =>
     api(`/api/proxy/v1/gui/agent/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" }),
 
