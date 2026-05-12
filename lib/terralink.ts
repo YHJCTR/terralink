@@ -337,6 +337,7 @@ export const TL = {
     onResponse: (token: string) => void,
     onDone: (sessionId: string) => void,
     onError: (msg: string) => void,
+    onEvent?: (event: Record<string, unknown>) => void,
   ): Promise<void> => {
     try {
       const token = getAuthTokenClient();
@@ -372,6 +373,7 @@ export const TL = {
           if (!line.startsWith("data: ")) continue;
           try {
             const evt = JSON.parse(line.slice(6));
+            onEvent?.(evt);
             if (evt.type === "thinking") onThinking(evt.token);
             else if (evt.type === "response") onResponse(evt.token);
             else if (evt.type === "done") onDone(evt.session_id);
@@ -389,6 +391,20 @@ export const TL = {
   agentClearSession: (sessionId: string) =>
     api(`/api/proxy/v1/gui/agent/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" }),
 
+  agentContextStatus: (sessionId: string) =>
+    api<AgentContextStatus>(`/api/proxy/v1/gui/agent/sessions/${encodeURIComponent(sessionId)}/context`),
+
+  agentCompactSession: (sessionId: string) =>
+    api<AgentContextStatus>(`/api/proxy/v1/gui/agent/sessions/${encodeURIComponent(sessionId)}/compact`, {
+      method: "POST",
+    }),
+
+  agentBtw: (sessionId: string, message: string) =>
+    api<AgentBtwResponse>(`/api/proxy/v1/gui/agent/sessions/${encodeURIComponent(sessionId)}/btw`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+
   getUserToolStats: (params?: {
     start_date?: string;
     end_date?: string;
@@ -405,3 +421,29 @@ export const TL = {
     return api(`/api/proxy/v1/analytics/user-tool-stats?${searchParams.toString()}`);
   },
 };
+
+export interface AgentContextStatus {
+  session_id: string;
+  exists: boolean;
+  raw_message_count: number;
+  summary_message_count: number;
+  has_summary: boolean;
+  summary_preview: string;
+  estimated_raw_tokens: number;
+  estimated_summary_tokens: number;
+  estimated_context_tokens: number;
+  max_model_len: number;
+  remaining_context_tokens: number;
+  can_compact: boolean;
+  max_history_messages: number;
+  summary_threshold: number;
+  summary_keep_recent: number;
+  compacted?: boolean | null;
+}
+
+export interface AgentBtwResponse {
+  session_id: string;
+  response: string;
+  thinking: string;
+  persisted: boolean;
+}
