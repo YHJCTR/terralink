@@ -405,6 +405,36 @@ export const TL = {
       body: JSON.stringify({ message }),
     }),
 
+  agentApproveRun: async (runId: string, approvalId: string, note?: string) => {
+    const token = getAuthTokenClient();
+    const form = new FormData();
+    form.append("approval_id", approvalId);
+    if (note) form.append("note", note);
+    const r = await fetch(`/api/proxy/v1/gui/agent/runs/${encodeURIComponent(runId)}/approve`, {
+      method: "POST",
+      body: form,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data?.detail || r.statusText);
+    return data as { status: string; run_id: string; approval_id: string };
+  },
+
+  agentDenyRun: async (runId: string, approvalId: string, note?: string) => {
+    const token = getAuthTokenClient();
+    const form = new FormData();
+    form.append("approval_id", approvalId);
+    if (note) form.append("note", note);
+    const r = await fetch(`/api/proxy/v1/gui/agent/runs/${encodeURIComponent(runId)}/deny`, {
+      method: "POST",
+      body: form,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data?.detail || r.statusText);
+    return data as { status: string; run_id: string; approval_id: string };
+  },
+
   getUserToolStats: (params?: {
     start_date?: string;
     end_date?: string;

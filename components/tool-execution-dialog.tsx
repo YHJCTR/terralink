@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { Download, FileText, X } from 'lucide-react';
 import { Tool } from '@/lib/types';
 
 interface ToolExecutionDialogProps {
@@ -26,6 +26,114 @@ export default function ToolExecutionDialog({
 
   if (!isOpen || !tool) return null;
 
+  const isOutputPathParam = (key: string) => {
+    const lowered = key.toLowerCase();
+    return lowered === 'output_path' || lowered === 'output_dir' || lowered.endsWith('_output_path') || lowered.endsWith('_output_dir');
+  };
+
+  const isFileParam = (key: string, param: any = {}) => {
+    if (isOutputPathParam(key)) return false;
+    if (param?.type === 'number' || param?.type === 'integer' || param?.type === 'boolean') return false;
+    const lowered = key.toLowerCase();
+    if (['format', 'unit', 'travel_mode', 'layer_name', 'src_layer', 'tar_layer'].includes(lowered)) return false;
+    const description = String(param?.description || '').toLowerCase();
+    const signal = `${lowered} ${description}`;
+    return (
+      lowered === 'image' ||
+      lowered === 'images' ||
+      lowered.endsWith('_path') ||
+      lowered.endsWith('_paths') ||
+      lowered.includes('geojson') ||
+      lowered.includes('gpkg') ||
+      lowered.includes('telemetry') ||
+      lowered.includes('video') ||
+      lowered.includes('raster') ||
+      lowered.includes('shapefile') ||
+      /^b\d{2}$/.test(lowered) ||
+      /^(red|green|blue|nir|swir|qa|sr|lst|ndvi|fvc|dem|bt_day|bt_night|emis_day|emis_night)$/.test(lowered) ||
+      /\b(path|file|geotiff|raster|geojson|gpkg|csv|gpx|mavlink|npy|video|shapefile)\b/.test(signal)
+    );
+  };
+
+  const acceptsForParam = (key: string, param: any = {}) => {
+    const signal = `${key} ${param?.description || ''}`.toLowerCase();
+    if (signal.includes('image')) return 'image/*,.tif,.tiff,.npy';
+    if (signal.includes('video')) return 'video/*,.mp4,.mov,.avi';
+    if (signal.includes('telemetry') || signal.includes('gpx') || signal.includes('mavlink')) return '.csv,.gpx,.json';
+    if (signal.includes('geojson')) return '.geojson,.json';
+    if (signal.includes('gpkg')) return '.gpkg';
+    if (signal.includes('shapefile')) return '.zip,.shp';
+    if (signal.includes('npy')) return '.npy,.tif,.tiff';
+    return '.tif,.tiff,.geotiff,.img,.vrt,.npy,.csv,.json,.geojson,.gpkg';
+  };
+
+  const allowsMultipleFiles = (key: string, param: any = {}) => {
+    return key.endsWith('s') || key.endsWith('_paths') || param?.type === 'array';
+  };
+
+  const internalResultKeys = new Set([
+    'metadata',
+    'runtime_dir',
+    'upload_dir',
+    'output_dir',
+    'artifact_dir',
+    'scratch_dir',
+    'manifest_path',
+  ]);
+
+  const basename = (path: string) => path.split(/[\\/]/).pop() || path;
+
+  const collectRuntimeFileLinks = (value: any, key = ''): Array<{ label: string; path: string; filename: string }> => {
+    const links: Array<{ label: string; path: string; filename: string }> = [];
+    const fileExtPattern = /\.(tif|tiff|json|geojson|csv|gpx|gpkg|npy|png|jpg|jpeg|txt|zip)$/i;
+    const pathKeyPattern = /(output_path|gpkg|artifact_path|file_path|telemetry_path|raster_path)$/i;
+
+    if (internalResultKeys.has(key)) return links;
+
+    if (typeof value === 'string' && (fileExtPattern.test(value) || pathKeyPattern.test(key))) {
+      const filename = basename(value);
+      links.push({ label: key || filename, path: value, filename });
+      return links;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => links.push(...collectRuntimeFileLinks(item, `${key}[${index}]`)));
+      return links;
+    }
+    if (value && typeof value === 'object') {
+      Object.entries(value).forEach(([childKey, childValue]) => {
+        links.push(...collectRuntimeFileLinks(childValue, childKey));
+      });
+    }
+    return links;
+  };
+
+  const sanitizeResultForDisplay = (value: any, key = ''): any => {
+    if (internalResultKeys.has(key)) return undefined;
+
+    if (typeof value === 'string') {
+      const fileExtPattern = /\.(tif|tiff|json|geojson|csv|gpx|gpkg|npy|png|jpg|jpeg|txt|zip)$/i;
+      const pathKeyPattern = /(output_path|gpkg|artifact_path|file_path|telemetry_path|raster_path)$/i;
+      if (fileExtPattern.test(value) || pathKeyPattern.test(key)) return basename(value);
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .map((item, index) => sanitizeResultForDisplay(item, `${key}[${index}]`))
+        .filter((item) => item !== undefined);
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.entries(value).reduce((acc, [childKey, childValue]) => {
+        const sanitized = sanitizeResultForDisplay(childValue, childKey);
+        if (sanitized !== undefined) acc[childKey] = sanitized;
+        return acc;
+      }, {} as Record<string, any>);
+    }
+
+    return value;
+  };
+
   const handleParameterChange = (paramName: string, value: any) => {
     setParameters(prev => ({
       ...prev,
@@ -41,20 +149,18 @@ export default function ToolExecutionDialog({
     
     required.forEach((paramKey: string) => {
       const value = parameters[paramKey];
+      const param = tool.parameters.properties?.[paramKey];
 
-      const isImageKey =
-        paramKey === 'image' ||
-        paramKey === 'images' ||
-        paramKey === 'image_path' ||
-        paramKey === 'image_paths';
+      if (isOutputPathParam(paramKey)) return;
+
+      const isUploadKey = isFileParam(paramKey, param);
 
       const isFileSatisfied =
-        isImageKey &&
+        isUploadKey &&
         Array.isArray(fileParams[paramKey]) &&
         fileParams[paramKey].length > 0;
 
       if (!isFileSatisfied && (value === undefined || value === null || value === '')) {
-        const param = tool.parameters.properties?.[paramKey];
         errors.push(`${paramKey}${param?.description ? ` (${param.description})` : ''} is required`);
       }
     });
@@ -83,16 +189,23 @@ export default function ToolExecutionDialog({
         return acc;
       }, {} as Record<string, any>);
       
-      const imageKeys = ['image', 'images', 'image_path', 'image_paths'] as const;
-      const hasFiles = imageKeys.some((k) => (fileParams[k]?.length ?? 0) > 0);
+      const fileEntries = Object.entries(fileParams).filter(([, files]) => files.length > 0);
+      const hasFiles = fileEntries.length > 0;
       if (hasFiles) {
         const form = new FormData();
-      
-        const { image, images, image_path, image_paths, ...rest } = cleanedParameters;
-        form.append('inputs', JSON.stringify(rest));
-      
-        const files: File[] = imageKeys.flatMap((k) => fileParams[k] || []);
-        files.forEach((f) => form.append('files', f));
+
+        const uploadParamNames: string[] = [];
+        const inputsWithoutFileValues = { ...cleanedParameters };
+        fileEntries.forEach(([paramName, files]) => {
+          delete inputsWithoutFileValues[paramName];
+          files.forEach((file) => {
+            uploadParamNames.push(paramName);
+            form.append('files', file);
+          });
+        });
+
+        form.append('inputs', JSON.stringify(inputsWithoutFileValues));
+        form.append('metadata', JSON.stringify({ file_param_names: uploadParamNames }));
       
         const resp = await fetch(
           `/api/proxy/v1/gui/tools/${encodeURIComponent(tool.slug)}/execute-multipart`,
@@ -133,12 +246,8 @@ export default function ToolExecutionDialog({
 
   const renderParameterInput = (key: string, param: any) => {
     const value = parameters[key] ?? param.default ?? '';
-    const isRequired = tool?.parameters?.required?.includes(key) || false;
-    const isImageParam =
-      key === 'image' ||
-      key === 'images' ||
-      key === 'image_path' ||
-      key === 'image_paths';
+    const isRequired = (tool?.parameters?.required?.includes(key) || false) && !isOutputPathParam(key);
+    const isUploadParam = isFileParam(key, param);
     
     const handleChange = (newValue: any) => {
       setParameters(prev => ({
@@ -150,19 +259,15 @@ export default function ToolExecutionDialog({
     const baseInputClass = "w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-colors text-gray-900";
     const inputClass = `${baseInputClass} ${isRequired && !value ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`;
 
-    if (isImageParam) {
-      const multiple = key === 'images' || key === 'image_paths';
+    if (isUploadParam) {
+      const multiple = allowsMultipleFiles(key, param);
       const files = fileParams[key] || [];
     
       const handleFilesChange = (selected: File[]) => {
-        // Clear all image-related keys to avoid file accumulation
-        const newFileParams: Record<string, File[]> = {};
-        ['image', 'images', 'image_path', 'image_paths'].forEach(imageKey => {
-          if (imageKey === key) {
-            newFileParams[imageKey] = selected;
-          }
-        });
-        setFileParams(newFileParams);
+        setFileParams(prev => ({
+          ...prev,
+          [key]: selected
+        }));
         handleChange(undefined);
       };
     
@@ -177,11 +282,11 @@ export default function ToolExecutionDialog({
           <div className="inline-flex items-center">
             <label className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-blue-700 cursor-pointer transition-colors">
               <span className="mr-2">
-                {multiple ? 'Upload Images' : 'Upload Image'}
+                {multiple ? 'Upload Files' : 'Upload File'}
               </span>
               <input
                 type="file"
-                accept="image/*"
+                accept={acceptsForParam(key, param)}
                 multiple={multiple}
                 className="hidden"
                 onChange={(e) => {
@@ -200,14 +305,21 @@ export default function ToolExecutionDialog({
                   className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
                 >
                   <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt={file.name}
-                      className="w-full h-full object-cover"
-                      onLoad={(e) => {
-                        URL.revokeObjectURL((e.target as HTMLImageElement).src);
-                      }}
-                    />
+                    {file.type.startsWith('image/') ? (
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                        onLoad={(e) => {
+                          URL.revokeObjectURL((e.target as HTMLImageElement).src);
+                        }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-gray-500">
+                        <FileText size={28} />
+                        <span className="text-[10px] uppercase">{file.name.split('.').pop() || 'file'}</span>
+                      </div>
+                    )}
                   </div>
     
                   <div className="px-2 py-1 text-xs text-gray-700 truncate">
@@ -230,8 +342,8 @@ export default function ToolExecutionDialog({
           {files.length === 0 && (
             <p className="text-xs text-gray-500">
               {multiple
-                ? 'No images selected. Click "Upload Images" to choose multiple files.'
-                : 'No image selected. Click "Upload Image" to choose a file.'}
+                ? 'No files selected. Click "Upload Files" to choose multiple files.'
+                : 'No file selected. Click "Upload File" to choose a file.'}
             </p>
           )}
         </div>
@@ -386,13 +498,9 @@ export default function ToolExecutionDialog({
                 <h3 className="text-lg font-medium text-gray-900">Parameter Configuration</h3>
                 {Object.entries(tool.parameters.properties).map(([key, param]: [string, any]) => {
                   const isRequired = tool.parameters.required?.includes(key);
-                  const isImageKey =
-                    key === 'image' ||
-                    key === 'images' ||
-                    key === 'image_path' ||
-                    key === 'image_paths';
+                  const isUploadKey = isFileParam(key, param);
                   const hasFileValue =
-                    isImageKey &&
+                    isUploadKey &&
                     Array.isArray(fileParams[key]) &&
                     fileParams[key].length > 0;
                   
@@ -455,12 +563,31 @@ export default function ToolExecutionDialog({
                   <h4 className="text-green-800 font-medium mb-2">Execution Successful</h4>
                   <div className="bg-white border rounded p-3 max-h-96 overflow-y-auto">
                     <pre className="text-sm text-gray-800 whitespace-pre-wrap">
-                      {typeof executionResult === 'string' 
-                        ? executionResult 
-                        : JSON.stringify(executionResult, null, 2)
+                      {typeof executionResult === 'string'
+                        ? executionResult
+                        : JSON.stringify(sanitizeResultForDisplay(executionResult), null, 2)
                       }
                     </pre>
                   </div>
+                  {collectRuntimeFileLinks(executionResult?.outputs ?? executionResult).length > 0 && (
+                    <div className="mt-3 rounded border border-green-200 bg-white p-3">
+                      <h5 className="text-sm font-medium text-green-900 mb-2">Output Files</h5>
+                      <div className="space-y-2">
+                        {collectRuntimeFileLinks(executionResult?.outputs ?? executionResult).map((file, index) => (
+                          <a
+                            key={`${file.path}-${index}`}
+                            href={`/api/proxy/v1/gui/runtime/files?path=${encodeURIComponent(file.path)}`}
+                            className="flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Download size={14} />
+                            <span className="truncate">{file.filename}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

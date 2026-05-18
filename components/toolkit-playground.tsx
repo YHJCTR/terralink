@@ -39,7 +39,7 @@ export default function ToolkitPlayground({
     return await onExecuteTool(toolSlug, args);
   };
 
-  const getToolStatusColor = (status: string) => {
+  const getToolStatusColor = (status?: string) => {
     switch (status) {
       case 'available':
         return 'bg-green-100 text-green-800 border-green-200';
@@ -52,7 +52,7 @@ export default function ToolkitPlayground({
     }
   };
 
-  const getToolStatusText = (status: string) => {
+  const getToolStatusText = (status?: string) => {
     switch (status) {
       case 'available':
         return 'Available';

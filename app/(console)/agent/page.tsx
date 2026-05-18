@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Archive, Gauge, Loader2, MessageCircle, RefreshCw } from "lucide-react";
+import { Archive, Check, Gauge, Loader2, MessageCircle, RefreshCw, X } from "lucide-react";
 import { TL, type AgentContextStatus } from "@/lib/terralink";
 
 const STORAGE_KEY = "terrabox_agent_session";
@@ -35,6 +35,21 @@ interface ToolTraceEvent {
   durationMs?: number;
   text?: string;
   errorType?: string;
+}
+
+interface GpuStatusItem {
+  id: string;
+  free_mib: number;
+  utilization_pct: number;
+}
+
+interface PendingApproval {
+  approvalId: string;
+  runId: string;
+  toolSlug: string;
+  reason: string;
+  gpus: GpuStatusItem[];
+  status: "pending" | "submitting";
 }
 
 function loadState(): PersistedState {
@@ -96,7 +111,7 @@ function eventText(evt: Record<string, unknown>) {
 
 function mergeTraceEvent(prev: ToolTraceEvent[], evt: Record<string, unknown>): ToolTraceEvent[] {
   const type = typeof evt.type === "string" ? evt.type : "";
-  if (!["tool_start", "tool_result", "artifact", "decision", "run_start", "run_metrics"].includes(type)) {
+  if (!["tool_start", "tool_result", "artifact", "decision", "run_start", "run_metrics", "approval_required", "approval_resolved"].includes(type)) {
     return prev;
   }
 
@@ -153,6 +168,84 @@ function mergeTraceEvent(prev: ToolTraceEvent[], evt: Record<string, unknown>): 
       text: eventText(evt) || (typeof evt.path === "string" ? evt.path : ""),
     },
   ];
+}
+
+function parseApprovalEvent(evt: Record<string, unknown>): PendingApproval | null {
+  if (evt.type !== "approval_required") return null;
+  const approvalId = typeof evt.approval_id === "string" ? evt.approval_id : "";
+  const runId = typeof evt.run_id === "string" ? evt.run_id : "";
+  const toolSlug = typeof evt.tool_slug === "string" ? evt.tool_slug : "unknown";
+  if (!approvalId || !runId) return null;
+  const metadata = evt.metadata && typeof evt.metadata === "object" ? evt.metadata as Record<string, unknown> : {};
+  const snapshot = metadata.gpu_snapshot && typeof metadata.gpu_snapshot === "object"
+    ? metadata.gpu_snapshot as Record<string, unknown>
+    : {};
+  const rawGpus = Array.isArray(snapshot.gpus) ? snapshot.gpus : [];
+  const gpus = rawGpus
+    .map((gpu) => gpu && typeof gpu === "object" ? gpu as Record<string, unknown> : null)
+    .filter((gpu): gpu is Record<string, unknown> => !!gpu)
+    .map((gpu) => ({
+      id: String(gpu.id ?? "?"),
+      free_mib: Number(gpu.free_mib ?? 0),
+      utilization_pct: Number(gpu.utilization_pct ?? 0),
+    }));
+  return {
+    approvalId,
+    runId,
+    toolSlug,
+    reason: typeof evt.reason === "string" ? evt.reason : "Human approval required before tool execution.",
+    gpus,
+    status: "pending",
+  };
+}
+
+function ApprovalPanel({
+  approval,
+  onApprove,
+  onDeny,
+}: {
+  approval: PendingApproval;
+  onApprove: () => void;
+  onDeny: () => void;
+}) {
+  return (
+    <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-medium">需要人工确认</div>
+          <div className="mt-1 font-mono text-[11px] text-amber-800">{approval.toolSlug}</div>
+          <div className="mt-1 text-amber-700">{approval.reason}</div>
+        </div>
+        <div className="flex shrink-0 gap-1">
+          <button
+            onClick={onApprove}
+            disabled={approval.status === "submitting"}
+            className="rounded-md bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+            title="同意执行"
+          >
+            {approval.status === "submitting" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            onClick={onDeny}
+            disabled={approval.status === "submitting"}
+            className="rounded-md bg-red-600 p-1.5 text-white hover:bg-red-700 disabled:opacity-50"
+            title="拒绝执行"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {approval.gpus.length > 0 ? approval.gpus.map((gpu) => (
+          <span key={gpu.id} className="rounded-md border border-amber-200 bg-white px-2 py-1 text-[11px] text-amber-800">
+            GPU {gpu.id}: {(gpu.free_mib / 1024).toFixed(1)}GB free, {gpu.utilization_pct}%
+          </span>
+        )) : (
+          <span className="text-[11px] text-amber-700">GPU status unavailable</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ToolTraceBlock({ events, streaming }: { events: ToolTraceEvent[]; streaming: boolean }) {
@@ -213,6 +306,7 @@ export default function AgentPage() {
   const [contextStatus, setContextStatus] = useState<AgentContextStatus | null>(null);
   const [isCompacting, setIsCompacting] = useState(false);
   const [commandMode, setCommandMode] = useState<"chat" | "btw">("chat");
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
 
   // Refs so onDone callback always reads current accumulated text
   const thinkingRef = useRef("");
@@ -265,6 +359,26 @@ export default function AgentPage() {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const resolveApproval = async (decision: "approve" | "deny") => {
+    if (!pendingApproval) return;
+    const current = pendingApproval;
+    setPendingApproval({ ...current, status: "submitting" });
+    try {
+      if (decision === "approve") {
+        await TL.agentApproveRun(current.runId, current.approvalId);
+      } else {
+        await TL.agentDenyRun(current.runId, current.approvalId);
+      }
+      setPendingApproval(null);
+    } catch (err: unknown) {
+      setPendingApproval({ ...current, status: "pending" });
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Approval error: ${err instanceof Error ? err.message : "request failed"}` },
+      ]);
+    }
+  };
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text && files.length === 0) return;
@@ -310,6 +424,7 @@ export default function AgentPage() {
     setStreamingThinking("");
     setStreamingResponse("");
     setStreamingTrace([]);
+    setPendingApproval(null);
     thinkingRef.current = "";
     responseRef.current = "";
     traceRef.current = [];
@@ -347,6 +462,7 @@ export default function AgentPage() {
         setStreamingThinking("");
         setStreamingResponse("");
         setStreamingTrace([]);
+        setPendingApproval(null);
         thinkingRef.current = "";
         responseRef.current = "";
         traceRef.current = [];
@@ -365,6 +481,7 @@ export default function AgentPage() {
         setStreamingThinking("");
         setStreamingResponse("");
         setStreamingTrace([]);
+        setPendingApproval(null);
         thinkingRef.current = "";
         responseRef.current = "";
         traceRef.current = [];
@@ -372,6 +489,14 @@ export default function AgentPage() {
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       },
       (evt) => {
+        const approval = parseApprovalEvent(evt);
+        if (approval) {
+          setPendingApproval(approval);
+          bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+        if (evt.type === "approval_resolved") {
+          setPendingApproval(null);
+        }
         const next = mergeTraceEvent(traceRef.current, evt);
         if (next !== traceRef.current) {
           traceRef.current = next;
@@ -396,6 +521,7 @@ export default function AgentPage() {
     setMessages([]);
     setFiles([]);
     setStreamingTrace([]);
+    setPendingApproval(null);
     traceRef.current = [];
   };
 
@@ -531,6 +657,13 @@ export default function AgentPage() {
                 <ThinkingBlock content={streamingThinking} streaming />
               )}
               <ToolTraceBlock events={streamingTrace} streaming />
+              {pendingApproval && (
+                <ApprovalPanel
+                  approval={pendingApproval}
+                  onApprove={() => void resolveApproval("approve")}
+                  onDeny={() => void resolveApproval("deny")}
+                />
+              )}
               <div className="rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm bg-white text-gray-800 border border-gray-200">
                 {streamingResponse || (
                   <span className="inline-flex gap-1">
