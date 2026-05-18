@@ -50,9 +50,17 @@ async function forward(req: NextRequest, path: string[]) {
     });
   }
 
-  const respBody = await r.text();
+  const responseHeaders: Record<string, string> = {
+    "content-type": r.headers.get("content-type") || "application/json",
+  };
+  const contentDisposition = r.headers.get("content-disposition");
+  if (contentDisposition) {
+    responseHeaders["content-disposition"] = contentDisposition;
+  }
+
+  const respBody = await r.arrayBuffer();
   return new NextResponse(respBody, {
     status: r.status,
-    headers: { "content-type": r.headers.get("content-type") || "application/json" }
+    headers: responseHeaders
   });
 }
