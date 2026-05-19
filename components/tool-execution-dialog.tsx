@@ -400,7 +400,18 @@ export default function ToolExecutionDialog({
           <input
             type="number"
             value={value}
-            onChange={(e) => handleChange(param.type === 'integer' ? parseInt(e.target.value) || '' : parseFloat(e.target.value) || '')}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
+                handleChange(raw);
+              } else if (param.type === 'integer') {
+                const n = parseInt(raw, 10);
+                handleChange(Number.isNaN(n) ? '' : n);
+              } else {
+                const n = parseFloat(raw);
+                handleChange(Number.isNaN(n) ? '' : n);
+              }
+            }}
             className={inputClass}
             placeholder={param.description || `Enter ${key}`}
             min={param.minimum}
