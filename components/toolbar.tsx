@@ -103,14 +103,6 @@ export default function Toolbar() {
           >
             Execution History
           </Link>
-          <Link
-            href="/agent"
-            className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-              pathname === '/agent' ? 'text-blue-700 font-bold' : 'text-gray-700'
-            }`}
-          >
-            Agent
-          </Link>
         </nav>
       </div>
     </div>

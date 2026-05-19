@@ -135,7 +135,7 @@ export default function Hero() {
                 Terralink
               </h1>
               <p className="text-xl lg:text-2xl text-gray-300 max-w-2xl">
-                Advanced Earth observation agents powered by AI. Monitor, analyze, and understand our planet like never before.
+                Advanced Earth observation tools for monitoring, analyzing, and understanding our planet.
               </p>
             </div>
 
@@ -196,7 +196,7 @@ export default function Hero() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm"
-                    placeholder="agent@terralink.com"
+                    placeholder="tools@terralink.com"
                     required
                   />
                 </div>
